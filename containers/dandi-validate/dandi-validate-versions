@@ -1,0 +1,57 @@
+#!/opt/venv/bin/python
+"""Print, as JSON, the versions of the software in the dandi-validate container."""
+
+import importlib.metadata
+import json
+import os
+import platform
+import subprocess
+
+KEY_DISTRIBUTIONS = (
+    "dandi",
+    "dandischema",
+    "datalad",
+    "datalad-fuse",
+    "remfile",
+    "con-duct",
+    "git-annex",
+    "pynwb",
+    "hdmf",
+    "h5py",
+    "nwbinspector",
+    "bidsschematools",
+)
+
+
+def _command_version(command: list[str]) -> str | None:
+    try:
+        output = subprocess.run(command, capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return output.splitlines()[0].strip() if output else None
+
+
+def _distribution_version(name: str) -> str | None:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+versions = {
+    "container_version": os.environ.get("DANDI_VALIDATE_CONTAINER_VERSION"),
+    "dandi_cli": {
+        "repository": os.environ.get("DANDI_VALIDATE_DANDI_CLI_REPOSITORY"),
+        "commit": os.environ.get("DANDI_VALIDATE_DANDI_CLI_COMMIT"),
+    },
+    "python": platform.python_version(),
+    "git": _command_version(["git", "--version"]),
+    "git_annex": _command_version(["git", "annex", "version", "--raw"]),
+    "key_distributions": {name: _distribution_version(name) for name in KEY_DISTRIBUTIONS},
+    "all_distributions": dict(
+        sorted(
+            (distribution.metadata["Name"], distribution.version) for distribution in importlib.metadata.distributions()
+        )
+    ),
+}
+print(json.dumps(versions, indent=2))

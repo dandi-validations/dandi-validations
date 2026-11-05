@@ -1,0 +1,13 @@
+{
+  "pipeline": "dandi+validate",
+  "container": {
+    "name": "dandi-validate",
+    "image": "ghcr.io/dandi-validations/dandi-validate",
+    "version": "v0.1.0"
+  },
+  "dandi_cli": {
+    "repository": "https://github.com/dandi/dandi-cli",
+    "commit": "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
+    "reference": "https://github.com/dandi/dandi-cli/pull/1956"
+  }
+}

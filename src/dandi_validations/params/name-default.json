@@ -1,0 +1,6 @@
+{
+  "missing_file_content": "stream",
+  "jobs": 8,
+  "min_severity": "INFO",
+  "compress_results_above_bytes": 26214400
+}

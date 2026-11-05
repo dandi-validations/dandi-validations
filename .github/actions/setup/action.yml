@@ -1,0 +1,62 @@
+name: Set up DANDI Validations
+description: >-
+  Prepare a runner to execute a DANDI Validations job capsule: Apptainer, DataLad with
+  datalad-container, git-annex, con-duct (duct) and the dandi-validations orchestration code
+  from the same ref as this action.
+
+inputs:
+  codebase-ref:
+    description: >-
+      The ref this action was used at (`uses: ...@<ref>`). It is resolved to a commit and
+      recorded in each job capsule's provenance.
+    default: main
+  python-version:
+    description: Python version for the host-side tools.
+    default: "3.13"
+
+outputs:
+  codebase-commit:
+    description: The commit of dandi-validations/dandi-validations that was installed.
+    value: ${{ steps.install.outputs.codebase-commit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Set up Apptainer
+      shell: bash
+      run: bash "${{ github.action_path }}/../../../scripts/setup_apptainer.sh"
+
+    - name: Install host tools and the orchestration code
+      id: install
+      shell: bash
+      run: |
+        set -euo pipefail
+        codebase="$(cd "${{ github.action_path }}/../../.." && pwd)"
+        python -m pip install --upgrade pip
+        python -m pip install "${codebase}"
+
+        ref="${{ inputs.codebase-ref }}"
+        if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+          commit="$ref"
+        else
+          commit="$(git ls-remote https://github.com/dandi-validations/dandi-validations "$ref" | head -n 1 | cut -f 1)"
+        fi
+        echo "DANDI_VALIDATIONS_CODEBASE_COMMIT=${commit:-unknown}" >> "$GITHUB_ENV"
+        echo "codebase-commit=${commit:-unknown}" >> "$GITHUB_OUTPUT"
+
+        git annex version | head -n 1
+        datalad --version
+        datalad containers-list --help > /dev/null
+        duct --version
+        dandi-validations --version
+
+    - name: Configure the git identity of commits made by jobs
+      shell: bash
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"

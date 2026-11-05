@@ -1,0 +1,7 @@
+* annex.backend=SHA256E
+# Everything in a job capsule (code, logs, results) is kept in git, so that it can be read on
+# GitHub, which does not host annexed content.
+* annex.largefiles=nothing
+# Container images are annexed: only their keys are recorded here. Their content is published on
+# the GitHub Container Registry (see a capsule's code/submit.sh).
+.datalad/environments/** annex.largefiles=anything
