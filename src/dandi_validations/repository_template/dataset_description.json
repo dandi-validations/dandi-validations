@@ -1,0 +1,19 @@
+{
+  "Name": "DANDI Validations: Dandiset {{ dandiset_id }}",
+  "Description": "Records of streaming dandi validate runs over Dandiset {{ dandiset_id }} of the DANDI Archive. Each run is a self-contained job capsule.",
+  "BIDSVersion": "1.10.1",
+  "DatasetType": "study",
+  "License": "CC-BY-4.0",
+  "GeneratedBy": [
+    {
+      "Name": "DANDI Validations",
+      "Description": "Runs dandi validate per Dandiset on GitHub Actions and records each run as a job capsule.",
+      "CodeURL": "{{ codebase_url }}"
+    }
+  ],
+  "SourceDatasets": [
+    {
+      "URL": "{{ dandiset_url }}"
+    }
+  ]
+}

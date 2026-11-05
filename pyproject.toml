@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dandi-validations"
+version = "0.1.0"
+description = "Run streaming DANDI validation per Dandiset on GitHub Actions and record each run as a job capsule."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+authors = [{ name = "Cody Baker", email = "cody.c.baker.phd@gmail.com" }]
+dependencies = [
+    # Host-side tools for running a job capsule. The validation itself runs inside the
+    # dandi-validate container (see containers/dandi-validate), not with these.
+    "datalad >= 1.1",
+    "datalad-container >= 1.2.5",
+    "con-duct >= 0.13",
+    "git-annex",
+    "requests >= 2.28",
+]
+
+[project.optional-dependencies]
+test = ["pytest >= 8"]
+
+[project.scripts]
+dandi-validations = "dandi_validations._cli:main"
+
+[project.urls]
+Repository = "https://github.com/dandi-validations/dandi-validations"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dandi_validations"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: needs access to the DANDI Archive's S3 bucket",
+    "datalad: needs datalad, datalad-container and git-annex on the host",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "E", "I"]
+
+[tool.ruff.lint.isort]
+relative-imports-order = "closest-to-furthest"
+
+[tool.codespell]
+skip = "*.jsonld,*.tsv"

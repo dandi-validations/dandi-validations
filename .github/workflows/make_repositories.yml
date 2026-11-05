@@ -1,0 +1,76 @@
+name: Make repositories
+
+# Creates dandi-validations/{dandiset_id} for every non-empty, open Dandiset that lacks one, and
+# syncs the managed files (the Validate workflow, README, dataset_description.json, ...) into
+# every one, as bids-dandisets/scripts does for its organization.
+#
+# Needs the `_GITHUB_API_KEY` secret: a token that can create repositories in the organization
+# and push workflow files to them (classic PAT scopes `repo`, `workflow`, `admin:org`; or a
+# fine-grained token with Administration, Contents and Workflows write access).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dandiset_ids:
+        description: Space-separated Dandiset IDs (default, all of them)
+        type: string
+        default: ""
+      limit:
+        description: At most this many Dandisets (default, no limit)
+        type: string
+        default: ""
+      codebase_ref:
+        description: Ref of this repository that the Dandiset repositories' workflows use
+        type: string
+        default: main
+      dispatch:
+        description: Also start the validation of each repository
+        type: boolean
+        default: false
+#  schedule:
+#    - cron: "41 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  MakeRepositories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      _GITHUB_API_KEY: ${{ secrets._GITHUB_API_KEY }}
+      DANDISET_IDS: ${{ inputs.dandiset_ids }}
+      LIMIT: ${{ inputs.limit }}
+      CODEBASE_REF: ${{ inputs.codebase_ref || 'main' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: python -m pip install .
+
+      - name: Create and sync the Dandiset repositories
+        run: |
+          set -euo pipefail
+          selection=()
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandiset-ids $DANDISET_IDS); fi
+          if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
+          dandi-validations ensure-repos "${selection[@]}" --codebase-ref "$CODEBASE_REF"
+
+      - name: Start their validations
+        if: inputs.dispatch
+        run: |
+          set -euo pipefail
+          selection=()
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandiset-ids $DANDISET_IDS); fi
+          if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
+          dandi-validations dispatch "${selection[@]}"
