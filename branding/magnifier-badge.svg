@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" viewBox="0 0 545 545" width="545" height="545">
+  <title>Passed badge</title>
+  <g id="badge" inkscape:groupmode="layer" inkscape:label="badge">
+    <circle id="badge-outline" fill="#344453" cx="112" cy="440" r="70"/>
+    <circle id="badge-face" fill="#3BA36A" cx="112" cy="440" r="58"/>
+    <path id="badge-tick" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" d="M84,442 L104,462 L142,420"/>
+  </g>
+</svg>
