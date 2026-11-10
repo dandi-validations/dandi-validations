@@ -172,7 +172,7 @@ To update the image:
 | **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them. It can also dispatch their validation. It never touches capsule branches or submodules. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
 | **Collect records** | Every 6 hours, reads every capsule of every repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`. |
-| **Tests** | The tests, around one golden example (Dandiset 000006, see [`tests/README.md`](tests/README.md)): its expected repository contents and validation results are committed in `tests/expected_output/`, and one real job runs end to end. |
+| **Tests** | The tests, around one example (Dandiset 000006, see [`tests/README.md`](tests/README.md)). What its repository holds after a validation, branch by branch, is committed in `tests/expected_output/`, and one real job runs end to end and is compared with it. |
 
 ## Setting up
 

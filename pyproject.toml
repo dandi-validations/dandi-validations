@@ -42,6 +42,7 @@ packages = ["src/dandi_validations"]
 testpaths = ["tests"]
 markers = [
     "ai_generated: mark test as AI-generated",
+    "container: runs the dandi-validation image with Apptainer (see scripts/e2e_local.sh)",
     "network: needs access to the DANDI Archive's S3 bucket",
     "datalad: needs datalad, datalad-container and git-annex on the host",
 ]

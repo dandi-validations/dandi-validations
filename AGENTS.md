@@ -34,7 +34,7 @@ These follow [CodyCBakerPhD/historia](https://github.com/CodyCBakerPhD/historia/
 - Use `pytest.mark.parametrize` wherever appropriate to reduce duplication in test cases.
 - Avoid importing private API (names with a leading underscore) in tests. Always import from what is publicly exposed through `__init__.py` files.
 - When monkeypatching internal imports in tests, target the importing module's binding (e.g., `foo.baz`), not the original definition module (e.g., `foo._bar.baz`).
-- The integration tests compare against one golden example, Dandiset 000006 (see `tests/README.md`). After an intended change to what a job writes, regenerate it with `DANDI_VALIDATIONS_REGENERATE_GOLDEN=1` and review the diff.
+- The integration tests compare against the expected output of one example, Dandiset 000006 (see `tests/README.md`). After an intended change to what a job writes, regenerate it with `DANDI_VALIDATIONS_REGENERATE_EXPECTED_OUTPUT=1` and review the diff.
 
 ## Module and API conventions
 

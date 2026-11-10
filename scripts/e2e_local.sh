@@ -1,14 +1,20 @@
 #!/bin/bash
 # End-to-end test of one validation job, without GitHub or GHCR.
 #
-# Builds the dandi-validation image locally with Docker (tagged by its version code), converts it
-# to a SIF with Apptainer, creates a Dandiset repository from the template in a local bare
-# "remote", and runs the job exactly as the Validate workflow does
-# (`dandi-validations run ... --push origin`). Then it checks that the capsule succeeded, that
-# every asset was streamed, that the provenance names the image, and that a second run skips.
+# Builds the dandi-validation image locally with Docker (tagged by its version code) and converts
+# it to a SIF with Apptainer. Then it runs one job exactly as the Validate workflow does.
 #
-# Needs: docker, apptainer, and this package installed (`pip install ".[test]"`), which brings datalad,
-# datalad-container, git-annex and con-duct.
+# For Dandiset 000006, the example of tests/, that is tests/test_expected_output.py's container
+# test. It runs the job against local stand-ins for GitHub and compares the repository with
+# tests/expected_output, branch by branch. The normalized repository is left in
+# WORK_DIRECTORY/actual, and the logs that test only shows are printed in collapsed groups.
+#
+# For any other Dandiset, it creates the repository from the template in a local bare "remote" and
+# runs `dandi-validations run ... --push origin` on the archive's current manifest. Then it checks
+# that the capsule succeeded, that every asset was streamed, and that a second run skips.
+#
+# Needs: docker, apptainer, and this package installed (`pip install ".[test]"`), which brings
+# datalad, datalad-container, git-annex and con-duct.
 #
 # Usage: scripts/e2e_local.sh [DANDISET_ID] [WORK_DIRECTORY]
 
@@ -48,6 +54,23 @@ DANDI_VALIDATIONS_IMAGE_DIGEST="$(docker image inspect --format '{{.Id}}' "${IMA
     || DANDI_VALIDATIONS_IMAGE_DIGEST="sha256:local"
 export DANDI_VALIDATIONS_IMAGE_DIGEST
 
+if [ -d "${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}" ]; then
+    ACTUAL="${WORK_DIRECTORY}/actual"
+    rm -rf "$ACTUAL"
+    cd "$REPOSITORY_ROOT"
+    DANDI_VALIDATIONS_ACTUAL_OUTPUT="$ACTUAL" python -m pytest -m container -v -rs tests/test_expected_output.py \
+        | tee "${WORK_DIRECTORY}/pytest.log"
+    # The test skips without the image, which must not pass for a run.
+    grep -q " 1 passed" "${WORK_DIRECTORY}/pytest.log"
+    for log in duct_stdout duct_stderr duct_usage.jsonl submit.log; do
+        echo "::group::logs/${log}"
+        cat "${ACTUAL}/${CODE}/logs/${log}"
+        echo "::endgroup::"
+    done
+    echo "End-to-end test passed."
+    exit 0
+fi
+
 REMOTE="${WORK_DIRECTORY}/remotes/${DANDISET_ID}.git"
 CLONE="${WORK_DIRECTORY}/runner/${DANDISET_ID}"
 rm -rf "$REMOTE" "$CLONE" "${WORK_DIRECTORY}/sync"
@@ -62,23 +85,15 @@ sync_repository(dandiset_id=dandiset_id, remote_url=f"file://{remote}", codebase
 EOF
 git clone --quiet "$REMOTE" "$CLONE"
 
-# The golden example's manifest is frozen in tests/ (see tests/README.md); other Dandisets use the
-# archive's current one.
-MANIFEST_ARGUMENTS=()
-GOLDEN_MANIFEST="${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}"
-if [ -d "$GOLDEN_MANIFEST" ]; then
-    MANIFEST_ARGUMENTS=(--manifest "$GOLDEN_MANIFEST")
-fi
-
 cd "$CLONE"
-dandi-validations run --dandiset "$DANDISET_ID" --push origin --timeout 60 "${MANIFEST_ARGUMENTS[@]}"
+dandi-validations run --dandiset "$DANDISET_ID" --push origin --timeout 60
 
-python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" "$GOLDEN_MANIFEST" "$WORK_DIRECTORY" <<'EOF'
+python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
 import json, pathlib, subprocess, sys
 
 from dandi_validations import capsule_row, read_provenance
 
-image, code, digest, remote, golden_manifest, work = sys.argv[1:]
+image, code, digest, remote = sys.argv[1:]
 
 
 def git(*arguments):
@@ -112,20 +127,12 @@ assert row["status"] == "successful", row
 summary = json.loads((capsule / "derivatives" / "summary.json").read_text())
 assert summary["files_streamed"] == row["assets"], (summary["files_streamed"], row["assets"])
 assert summary["files_missing_content"] == 0, summary
-
-if pathlib.Path(golden_manifest).is_dir():
-    # The golden example: its results must be exactly tests/expected_output/validated.
-    sys.path.insert(0, str(pathlib.Path(golden_manifest).parents[1]))
-    import golden
-
-    golden.check_validated(repository=pathlib.Path(remote), tag=code, work=pathlib.Path(work))
-else:
-    print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
+print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
 EOF
 
 git -C "$REMOTE" log --oneline main | head -n 5
 git -C "$REMOTE" log --oneline "$CODE" | head -n 5
 
 # A second run finds the successful capsule and does nothing.
-dandi-validations run --dandiset "$DANDISET_ID" --push origin "${MANIFEST_ARGUMENTS[@]}" 2>&1 | grep -q "already validated"
+dandi-validations run --dandiset "$DANDISET_ID" --push origin 2>&1 | grep -q "already validated"
 echo "End-to-end test passed."

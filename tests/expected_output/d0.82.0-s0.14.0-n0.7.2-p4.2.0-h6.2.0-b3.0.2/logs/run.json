@@ -1,0 +1,24 @@
+{
+  "exit_code": 0,
+  "timed_out": false,
+  "started_at": "<varies>",
+  "finished_at": "<varies>",
+  "host": {
+    "python": "<varies>",
+    "platform": "<varies>"
+  },
+  "github_actions": {
+    "repository": "dandi-validations/000006",
+    "run_id": "1",
+    "run_attempt": "1",
+    "workflow": "Validate",
+    "event_name": "workflow_dispatch",
+    "sha": "0000000000000000000000000000000000000000",
+    "runner_name": "GitHub Actions 1",
+    "runner_os": "Linux",
+    "runner_arch": "X64",
+    "image_os": "ubuntu24",
+    "image_version": "20261101.1",
+    "run_url": "https://github.com/dandi-validations/000006/actions/runs/1"
+  }
+}

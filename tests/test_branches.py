@@ -1,8 +1,8 @@
 """
-How capsule branches and main's submodules behave across jobs, on the golden example.
+How capsule branches and main's submodules behave across jobs, on the example Dandiset.
 
-The golden example is Dandiset 000006 (see tests/README.md). What a claimed repository holds is
-test_golden_example.py's.
+The example is Dandiset 000006 (see tests/README.md). What the repository holds is
+test_expected_output.py's.
 """
 
 import json
@@ -28,7 +28,7 @@ from dandi_validations import (
     sync_repository,
 )
 
-from .golden import EXAMPLE_DANDISET_ID, EXAMPLE_MANIFEST_DIRECTORY, NOW, World, git, make_world
+from .test_expected_output import EXAMPLE_DANDISET_ID, EXAMPLE_MANIFEST_DIRECTORY, NOW, World, git, make_world
 
 REPOSITORY_URL = f"https://github.com/dandi-validations/{EXAMPLE_DANDISET_ID}"
 

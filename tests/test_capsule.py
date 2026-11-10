@@ -1,8 +1,8 @@
 """
 Behavior of capsules, without git.
 
-What a capsule contains is shown, file by file, by the golden example (see tests/README.md and
-test_golden_example.py).
+What a capsule contains is shown, file by file, by the expected output (see tests/README.md and
+test_expected_output.py).
 """
 
 import dataclasses
