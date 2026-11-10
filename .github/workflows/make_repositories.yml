@@ -12,15 +12,15 @@ on:
   workflow_dispatch:
     inputs:
       dandiset_ids:
-        description: Space-separated Dandiset IDs (default, all of them)
+        description: Comma-separated Dandiset IDs (default, all of them)
         type: string
         default: ""
       limit:
         description: At most this many Dandisets (default, no limit)
         type: string
         default: ""
-      codebase_ref:
-        description: Ref of this repository that the Dandiset repositories' workflows use
+      branch_or_commit:
+        description: Branch name or commit hash
         type: string
         default: main
       dispatch:
@@ -45,7 +45,7 @@ jobs:
       _GITHUB_API_KEY: ${{ secrets._GITHUB_API_KEY }}
       DANDISET_IDS: ${{ inputs.dandiset_ids }}
       LIMIT: ${{ inputs.limit }}
-      CODEBASE_REF: ${{ inputs.codebase_ref || 'main' }}
+      CODEBASE_REF: ${{ inputs.branch_or_commit || 'main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           selection=()
-          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets ${DANDISET_IDS//,/ }); fi
           if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
           dandi-validations ensure-repos "${selection[@]}" --ref "$CODEBASE_REF"
 
@@ -71,6 +71,6 @@ jobs:
         run: |
           set -euo pipefail
           selection=()
-          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets ${DANDISET_IDS//,/ }); fi
           if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
           dandi-validations dispatch "${selection[@]}"
