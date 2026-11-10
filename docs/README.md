@@ -37,6 +37,8 @@ bash scripts/e2e_local.sh 000006
 ## Development
 
 Code style, tests, commits and the changelog follow [`AGENTS.md`](../AGENTS.md), which adopts the conventions of [CodyCBakerPhD/historia](https://github.com/CodyCBakerPhD/historia).
+A pull request that changes `src/` or `pyproject.toml` must bump the version in `pyproject.toml`, which the **Version Check** workflow enforces.
+Each capsule's `dataset_description.json` records that version, with the commit, as the version of this code that formed it.
 Its [pre-commit](https://pre-commit.com) hooks run black, ruff, numpydoc validation, mypy, codespell, shellcheck, [md-lines](https://github.com/CodyCBakerPhD/md-lines-pre-commit) and the workflow schema checks:
 
 ```bash
