@@ -62,7 +62,9 @@ repos:
     additional_dependencies:
     - types-requests
 
-- repo: https://github.com/koalaman/shellcheck-precommit
-  rev: v0.11.0
+# The same shellcheck as koalaman/shellcheck-precommit, packaged for Python rather than Docker,
+# which pre-commit.ci does not run.
+- repo: https://github.com/shellcheck-py/shellcheck-py
+  rev: v0.11.0.1
   hooks:
     - id: shellcheck
