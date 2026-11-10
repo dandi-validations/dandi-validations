@@ -14,7 +14,7 @@ The records collected from them, a table of every capsule, live in [dandi-valida
 
 ## Dandiset repositories
 
-Each `https://github.com/dandi-validations/{dandiset_id}` is a standalone ([type 2](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets)) BIDS derivative dataset of its Dandiset:
+Each `https://github.com/dandi-validations/{dandiset_id}` is a BIDS derivative ([type 2](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets)) dataset:
 
 ```
 https://github.com/dandi-validations/{dandiset_id}/   (main)
