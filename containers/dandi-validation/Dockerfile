@@ -15,11 +15,10 @@
 
 FROM ghcr.io/prefix-dev/pixi:0.84.1-noble@sha256:2d8821a1f3ee11a7fe8055f2c72d2b116d22f00c4caa73809857b5f216fcdebc AS build
 
-# Fetching the PyPI packages pinned to git commits needs a git executable in this stage only. The
-# image's own git is the locked one from conda-forge.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
-    && rm -rf /var/lib/apt/lists/*
+# Fetching the PyPI packages pinned to git commits needs git. pixi installs the conda packages,
+# the locked git among them, before the PyPI ones, so the environment's own git does it: no
+# operating-system package (or mirror) is involved.
+ENV PATH=/opt/dandi-validation/.pixi/envs/default/bin:${PATH}
 
 WORKDIR /opt/dandi-validation
 COPY pixi.toml pixi.lock ./
