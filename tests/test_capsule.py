@@ -24,6 +24,7 @@ from dandi_validations import (
 )
 
 NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.UTC)
+CLAIM_MARKER = "code/submitted_date-2026+11+05_time-00+00+00"
 
 
 def _prepare(  # noqa: PLR0913
@@ -154,20 +155,17 @@ def test_nothing_to_stream(git_repository: pathlib.Path, dandiset_yaml: bytes) -
     assert "no assets" in result.reason
 
 
-SUBMITTED = "code/submitted_date-2026+11+05_time-00+00+00"
-
-
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
     ("contents", "expected_status"),
     [
         ([], "unknown"),
         (["code/"], "pending"),
-        ([SUBMITTED], "stalled"),
+        ([CLAIM_MARKER], "stalled"),
         # An empty logs directory is not a log.
-        ([SUBMITTED, "logs/"], "stalled"),
-        ([SUBMITTED, "logs/submit.log"], "failed"),
-        ([SUBMITTED, "logs/submit.log", "derivatives/validation.jsonl"], "successful"),
+        ([CLAIM_MARKER, "logs/"], "stalled"),
+        ([CLAIM_MARKER, "logs/submit.log"], "failed"),
+        ([CLAIM_MARKER, "logs/submit.log", "derivatives/validation.jsonl"], "successful"),
     ],
 )
 def test_capsule_status_levels(tmp_path: pathlib.Path, contents: list[str], expected_status: str) -> None:
