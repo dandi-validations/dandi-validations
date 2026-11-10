@@ -6,7 +6,7 @@ The overview is in the [README](../README.md).
 
 1. Add the `_GITHUB_API_KEY` repository secret, a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) with:
   - Resource owner as the `dandi-validations` organization.
-  - With access to all its repositories.
+  - Access to all its repositories.
   - Read and write permissions for:
     - Administration (to create repositories).
     - Contents (to push the template).
