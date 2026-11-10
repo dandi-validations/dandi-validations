@@ -4,8 +4,8 @@ Records of [`dandi validate`](https://github.com/dandi/dandi-cli) runs over [Dan
 
 Each run happens on this repository's own GitHub Actions runner (the **Validate** workflow):
 
-1. A DataLad dataset of the Dandiset is built from the archive's manifest on S3: every file gets its SHA-256 git-annex key and its S3 URL, and nothing is downloaded.
-2. `dandi validate --missing-file-content=stream` validates it, streaming only the parts of each file the validators read ([dandi/dandi-cli#1956](https://github.com/dandi/dandi-cli/pull/1956)).
+1. A DataLad dataset of the Dandiset is built directly from the archive's manifest from S3: every file gets its SHA-256 git-annex key and its S3 URL, and nothing is downloaded.
+2. `dandi validate --missing-file-content=stream` validates it, streaming only the parts of each file the validators need.
 3. The validation runs inside the `dandi-validation` image from the GitHub Container Registry (`{{ image }}:{tag}`), through Apptainer, with `datalad containers-run`, whose commit records the command, its inputs and its outputs.
    [duct](https://github.com/con/duct) records its resource usage.
 
