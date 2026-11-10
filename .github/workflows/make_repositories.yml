@@ -20,7 +20,7 @@ on:
         type: string
         default: ""
       codebase_ref:
-        description: Version of dandi-validations the Dandiset repositories run (branch, tag, or full SHA)
+        description: Branch name or commit hash
         type: string
         default: main
       dispatch:
