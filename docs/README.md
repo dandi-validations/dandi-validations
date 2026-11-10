@@ -4,9 +4,14 @@ The overview is in the [README](../README.md).
 
 ## Setting up
 
-1. Add the `_GITHUB_API_KEY` repository secret, a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token).
-   Its resource owner is the `dandi-validations` organization, with access to all its repositories, so that it covers the repositories it creates.
-   It needs these repository permissions, all read and write: Administration (to create repositories), Contents (to push the template), Workflows (to push workflow files) and Actions (to dispatch workflows).
+1. Add the `_GITHUB_API_KEY` repository secret, a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) with:
+  - Resource owner as the `dandi-validations` organization.
+  - With access to all its repositories.
+  - Read and write permissions for:
+    - Administration (to create repositories).
+    - Contents (to push the template).
+    - Workflows (to push workflow files).
+    - Actions (to dispatch workflows).
 2. Run **Build and publish container**, then make the `dandi-validation` package public (Package settings → Change visibility), so that every repository's runner can pull it anonymously.
 3. [Optional] Manually run **Make repositories** (e.g., `dandiset_ids: 000003`), then **Dispatch validations**.
 
