@@ -60,6 +60,14 @@ def _clone(*, world: World, name: str) -> pathlib.Path:
     return destination
 
 
+def _changed_manifest(tmp_path: pathlib.Path, /) -> pathlib.Path:
+    changed_manifest = tmp_path / "changed-manifest"
+    shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
+    with (changed_manifest / "dandiset.yaml").open("a") as stream:
+        stream.write("description: changed\n")
+    return changed_manifest
+
+
 @pytest.mark.ai_generated
 def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
@@ -127,16 +135,28 @@ def test_reruns_skip_unchanged_inputs_and_add_to_the_branch(
 
     # Changed content is a new run on the same branch, which keeps the earlier commits, and main
     # is pinned to its new head.
-    changed_manifest = tmp_path / "changed-manifest"
-    shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
-    with (changed_manifest / "dandiset.yaml").open("a") as stream:
-        stream.write("description: changed\n")
-    assert _claim(other, manifest_directory=changed_manifest) == 0
+    assert _claim(other, manifest_directory=_changed_manifest(tmp_path)) == 0
     new_head = remote_heads(root=other, remote="origin")[capsule.tag]
     assert new_head != first_head
     assert first_head in git("rev-list", capsule.tag, cwd=world.repository).split()
     assert git("ls-tree", "main", capsule.name, cwd=world.repository).split()[2] == new_head
     assert git("ls-tree", "-r", "--name-only", capsule.tag, "derivatives", cwd=world.repository) == ""
+
+
+@pytest.mark.ai_generated
+def test_a_runner_behind_main_claims_on_top_of_it(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A rerun checks out the commit its first attempt was dispatched at, from before that attempt
+    # added main's submodule.
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    rerun = _clone(world=world, name="rerun")
+    _claim(world.runner)
+    first_main = git("rev-parse", "main", cwd=world.repository).strip()
+
+    assert _claim(rerun, manifest_directory=_changed_manifest(tmp_path)) == 0
+    capsule = _capsule(rerun)
+    assert git("rev-parse", "main~1", cwd=world.repository).strip() == first_main
+    new_head = remote_heads(root=rerun, remote="origin")[capsule.tag]
+    assert git("ls-tree", "main", capsule.name, cwd=world.repository).split()[2] == new_head
 
 
 @pytest.mark.ai_generated

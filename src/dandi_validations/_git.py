@@ -95,6 +95,24 @@ def ensure_annex(
     run(command=["git", "annex", "init", description], cwd=root)
 
 
+def pull(*, root: pathlib.Path, remote: str = "origin", branch: str) -> None:
+    """
+    Rebase HEAD onto a remote branch, which fast-forwards a clone that is only behind it.
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        The root of the clone.
+    remote : str, default="origin"
+        The remote to fetch from.
+    branch : str
+        The branch to rebase onto.
+
+    """
+    run(command=["git", "fetch", "--quiet", remote, branch], cwd=root)
+    run(command=["git", "rebase", "--quiet", "FETCH_HEAD"], cwd=root)
+
+
 def push(*, root: pathlib.Path, remote: str = "origin", branch: str, attempts: int = 4) -> None:
     """
     Push HEAD to a branch, rebasing onto concurrent pushes.
@@ -129,5 +147,4 @@ def push(*, root: pathlib.Path, remote: str = "origin", branch: str, attempts: i
             message = f"Could not push to {remote} after {attempts} attempts:\n{result.stderr}"
             raise RuntimeError(message)
         time.sleep(2**attempt)
-        run(command=["git", "fetch", remote, branch], cwd=root)
-        run(command=["git", "rebase", "FETCH_HEAD"], cwd=root)
+        pull(root=root, remote=remote, branch=branch)
