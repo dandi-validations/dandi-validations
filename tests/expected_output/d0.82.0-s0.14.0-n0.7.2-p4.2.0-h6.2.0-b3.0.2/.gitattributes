@@ -1,0 +1,4 @@
+* annex.backend=SHA256E
+* annex.largefiles=nothing
+# The image is annexed: only its key is recorded; its content is published on GHCR.
+envs/** annex.largefiles=anything

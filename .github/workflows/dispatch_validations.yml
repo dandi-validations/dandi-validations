@@ -1,0 +1,64 @@
+name: Dispatch validations
+
+# Starts the Validate workflow of Dandiset repositories (all of them by default). Each runs on
+# its own GitHub Actions runner and skips quickly when its Dandiset has not changed since its
+# last successful job. Needs the `_GITHUB_API_KEY` secret, a fine-grained personal access token with
+# Actions write access to the repositories (see docs/README.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dandiset_ids:
+        description: Space-separated Dandiset IDs (default, every Dandiset repository)
+        type: string
+        default: ""
+      limit:
+        description: At most this many repositories (default, no limit)
+        type: string
+        default: ""
+      force:
+        description: Validate even if a job with the same inputs already succeeded
+        type: boolean
+        default: false
+      dandiset_version:
+        description: Dandiset version to validate
+        type: string
+        default: draft
+#  schedule:
+#    - cron: "23 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  Dispatch:
+    runs-on: ubuntu-latest
+    env:
+      _GITHUB_API_KEY: ${{ secrets._GITHUB_API_KEY }}
+      DANDISET_IDS: ${{ inputs.dandiset_ids }}
+      LIMIT: ${{ inputs.limit }}
+      DANDISET_VERSION: ${{ inputs.dandiset_version || 'draft' }}
+      FORCE: ${{ inputs.force && '--force' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: python -m pip install .
+
+      - name: Dispatch
+        run: |
+          set -euo pipefail
+          selection=()
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
+          if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
+          dandi-validations dispatch "${selection[@]}" --version "$DANDISET_VERSION" $FORCE

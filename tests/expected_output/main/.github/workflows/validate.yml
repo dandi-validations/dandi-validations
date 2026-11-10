@@ -1,0 +1,56 @@
+name: Validate
+
+# Validates Dandiset 000006 with `dandi validate --missing-file-content=stream`
+# (dandi/dandi-cli#1956) inside the dandi-validation image from GHCR, run through Apptainer by
+# `datalad containers-run` and tracked by duct. Each run is recorded in the capsule of its image:
+# the branch named by its tag, which main holds as the submodule pipeline-dandi+validate_tag-{tag}/.
+#
+# This file is managed by https://github.com/dandi-validations/dandi-validations:
+# edits made here are overwritten whenever the repository template is synced.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Validate even if a job with the same inputs already succeeded
+        type: boolean
+        default: false
+      dandiset_version:
+        description: Dandiset version to validate
+        type: string
+        default: draft
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validate
+  cancel-in-progress: false
+
+jobs:
+  Validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up DANDI Validations
+        uses: dandi-validations/dandi-validations/.github/actions/setup@main
+        with:
+          codebase-ref: main
+
+      - name: Validate Dandiset 000006
+        env:
+          DANDISET_VERSION: ${{ inputs.dandiset_version || 'draft' }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+        run: |
+          dandi-validations run \
+            --dandiset 000006 \
+            --version "$DANDISET_VERSION" \
+            --push origin \
+            --branch main \
+            --timeout 330 \
+            $FORCE

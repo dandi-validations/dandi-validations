@@ -1,0 +1,35 @@
+# The environment of the dandi-validation image, locked in pixi.lock.
+#
+# It holds what the recipe at the top of dandi/dandi-cli#1956 installs (git-annex, con-duct and
+# dandi with its `datalad` extra, for streaming), plus DataLad and datalad-container. Python, git
+# and git-annex come from conda-forge, so the lock pins them at exact versions instead of leaving
+# them to the base image's operating-system packages.
+#
+# dandi-cli and datalad-fuse are pinned to commits until their streaming support is released:
+# dandi/dandi-cli#1956 and datalad/datalad-fuse#131. Keep the dandi-cli commit in step with
+# src/dandi_validations/pipeline.json (a test checks this).
+
+[workspace]
+name = "dandi-validation"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+# The conda packages (Python, git, git-annex and their libraries) provide no PyPI distributions
+# that the PyPI dependencies could reuse, so the conda-to-PyPI name mapping (fetched from
+# prefix.dev at lock time) isn't needed.
+conda-pypi-map = false
+
+[dependencies]
+python = "3.13.*"
+git = "*"
+git-annex = "*"
+
+[pypi-dependencies]
+dandi = { git = "https://github.com/dandi/dandi-cli", rev = "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e", extras = ["datalad"] }
+datalad-fuse = { git = "https://github.com/datalad/datalad-fuse", rev = "e480cd8d521b3576f4e3c9bfb35be526435aa61e", extras = ["remfile"] }
+datalad = "*"
+datalad-container = "*"
+con-duct = "*"
+# A transitive dependency (through methodtools). Releases before 0.4.7 are sdists whose setup.py
+# imports pkg_resources, which current setuptools no longer has, so the resolver cannot even
+# read their metadata.
+wirerope = ">=0.4.7"

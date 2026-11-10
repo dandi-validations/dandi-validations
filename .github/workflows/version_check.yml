@@ -1,0 +1,43 @@
+name: Version Check
+
+# Every change to the package must bump its version in pyproject.toml, which each capsule's
+# dataset_description.json records as the version of this code that formed it (see AGENTS.md).
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "pyproject.toml"
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check version bump
+        run: |
+          set -euo pipefail
+          read_version() {
+            python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])'
+          }
+          PR_VERSION="$(read_version < pyproject.toml)"
+          echo "PR version:   $PR_VERSION"
+          if ! git cat-file -e "origin/${{ github.base_ref }}:pyproject.toml" 2> /dev/null; then
+            echo "The base branch has no pyproject.toml yet, so $PR_VERSION is the first version ✓"
+            exit 0
+          fi
+          BASE_VERSION="$(git show "origin/${{ github.base_ref }}:pyproject.toml" | read_version)"
+          echo "Base version: $BASE_VERSION"
+          if [ "$PR_VERSION" = "$BASE_VERSION" ]; then
+            echo "::error::Version has not been bumped. Please update the version in pyproject.toml."
+            exit 1
+          fi
+          echo "Version bumped from $BASE_VERSION to $PR_VERSION ✓"

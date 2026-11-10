@@ -1,0 +1,77 @@
+ci:
+  autoupdate_schedule: quarterly
+
+default_install_hook_types:
+  - pre-commit
+
+default_language_version:
+  python: python3.12
+
+# The golden example's inputs and expected output must stay byte for byte as they are.
+exclude: ^tests/(example_dandiset|expected_output)/
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+    - id: check-yaml
+      # Rendered before use, the repository template's workflow is not YAML as it is stored.
+      exclude: ^src/dandi_validations/repository_template/
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+    - id: check-json
+    - id: check-toml
+    - id: check-added-large-files
+    - id: check-case-conflict
+
+- repo: https://github.com/python-jsonschema/check-jsonschema
+  rev: 0.38.2
+  hooks:
+    - id: check-dependabot
+    - id: check-github-workflows
+      args: ["--verbose"]
+
+- repo: https://github.com/psf/black-pre-commit-mirror
+  rev: 26.10.0
+  hooks:
+  - id: black
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.16.10
+  hooks:
+  - id: ruff-check
+    args: [ --fix ]
+
+- repo: https://github.com/numpy/numpydoc
+  rev: v1.11.0
+  hooks:
+  - id: numpydoc-validation
+    files: ^src/
+
+- repo: https://github.com/CodyCBakerPhD/md-lines-pre-commit
+  rev: v0.1.0
+  hooks:
+    - id: md-lines
+      language_version: python3.13
+
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.4.3
+  hooks:
+  - id: codespell
+    additional_dependencies:
+    - tomli
+
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v2.4.0
+  hooks:
+  - id: mypy
+    additional_dependencies:
+    - jinja2
+    - types-requests
+
+# The same shellcheck as koalaman/shellcheck-precommit, packaged for Python rather than Docker,
+# which pre-commit.ci does not run.
+- repo: https://github.com/shellcheck-py/shellcheck-py
+  rev: v0.11.0.1
+  hooks:
+    - id: shellcheck

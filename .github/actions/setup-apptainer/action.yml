@@ -1,0 +1,9 @@
+name: Set up Apptainer
+description: Install Apptainer on an Ubuntu GitHub Actions runner.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Apptainer
+      shell: bash
+      run: bash "${{ github.action_path }}/../../../scripts/setup_apptainer.sh"
