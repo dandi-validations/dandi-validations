@@ -19,8 +19,6 @@ on:
         description: Dandiset version to validate
         type: string
         default: draft
-#  schedule:
-#    - cron: "17 5 * * 1"
 
 permissions:
   contents: write
