@@ -53,4 +53,6 @@ git -C {{ dandiset_id }} submodule update --init  # the capsules, not their sour
 dandi validate --load {{ dandiset_id }}/{{ capsule_pattern }}/derivatives/validation.jsonl --summary
 ```
 
+---
+
 This repository's shared files are managed by [{{ organization }}/dandi-validations]({{ codebase_url }}).

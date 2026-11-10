@@ -53,4 +53,6 @@ git -C 000006 submodule update --init  # the capsules, not their sourcedata/
 dandi validate --load 000006/pipeline-dandi+validate_tag-{tag}/derivatives/validation.jsonl --summary
 ```
 
+---
+
 This repository's shared files are managed by [dandi-validations/dandi-validations](https://github.com/dandi-validations/dandi-validations).
