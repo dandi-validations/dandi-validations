@@ -1,0 +1,4 @@
+* annex.backend=SHA256E
+# main holds only text files and the capsules' submodules: everything is kept in git. Each
+# capsule branch has its own .gitattributes.
+* annex.largefiles=nothing

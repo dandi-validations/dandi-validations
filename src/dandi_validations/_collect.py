@@ -17,7 +17,7 @@ from ._globals import ORGANIZATION
 
 _log = logging.getLogger(__name__)
 
-DEFAULT_CLONE_URL_TEMPLATE = "https://github.com/{organization}/{repository}.git"
+DEFAULT_CLONE_URL_TEMPLATE = "https://github.com/{organization}/{repository}"
 
 
 def _clone(url: str, destination: pathlib.Path, *, branch: str | None = None) -> bool:

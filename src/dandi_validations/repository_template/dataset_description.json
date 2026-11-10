@@ -1,6 +1,6 @@
 {
   "Name": "DANDI Validations: Dandiset {{ dandiset_id }}",
-  "Description": "Records of streaming dandi validate runs over Dandiset {{ dandiset_id }} of the DANDI Archive, as a standalone derivative dataset: one capsule ({{ capsule_pattern }}/) per dandi-validation image. DandiValidations holds each capsule's provenance.",
+  "Description": "Records of streaming dandi validate runs over Dandiset {{ dandiset_id }} of the DANDI Archive, as a standalone derivative dataset: one capsule ({{ capsule_pattern }}/) per dandi-validation image, each a study dataset with its own dataset_description.json recording its provenance.",
   "BIDSVersion": "1.10.1",
   "DatasetType": "derivative",
   "License": "CC-BY-4.0",
@@ -15,6 +15,5 @@
     {
       "URL": "{{ dandiset_url }}"
     }
-  ],
-  "DandiValidations": {}
+  ]
 }

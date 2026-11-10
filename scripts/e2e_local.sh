@@ -62,16 +62,24 @@ sync_repository(dandiset_id=dandiset_id, remote_url=f"file://{remote}", codebase
 EOF
 git clone --quiet "$REMOTE" "$CLONE"
 
-cd "$CLONE"
-dandi-validations run --dandiset-id "$DANDISET_ID" --push origin --time-limit-minutes 60
+# The golden example's manifest is frozen in tests/ (see tests/README.md); other Dandisets use the
+# archive's current one.
+MANIFEST_ARGUMENTS=()
+GOLDEN_MANIFEST="${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}"
+if [ -d "$GOLDEN_MANIFEST" ]; then
+    MANIFEST_ARGUMENTS=(--manifest-directory "$GOLDEN_MANIFEST")
+fi
 
-python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
+cd "$CLONE"
+dandi-validations run --dandiset-id "$DANDISET_ID" --push origin --time-limit-minutes 60 "${MANIFEST_ARGUMENTS[@]}"
+
+python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" "$GOLDEN_MANIFEST" "$WORK_DIRECTORY" <<'EOF'
 import json, pathlib, subprocess, sys
 
 from dandi_validations._capsule import read_provenance
 from dandi_validations._capsule_table import capsule_row
 
-image, code, digest, remote = sys.argv[1:]
+image, code, digest, remote, golden_manifest, work = sys.argv[1:]
 
 
 def git(*arguments):
@@ -79,15 +87,17 @@ def git(*arguments):
 
 
 name = f"pipeline-dandi+validate_tag-{code}"
-# main: the single dataset_description.json, and the capsule's submodule pinned to its branch.
+# main: the derivative dataset, and the capsule's submodule pinned to its branch.
 assert git("ls-tree", "main", name).split()[:3] == ["160000", "commit", git("rev-parse", code).strip()]
 assert f"branch = {code}" in git("show", "main:.gitmodules")
 assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] == "derivative"
-# The branch named by the tag: the capsule at its root, its image's registration and its run record.
+# The branch named by the tag: the capsule at its root (a study dataset), its image's registration
+# and its run record.
 files = set(git("ls-tree", "-r", "--name-only", code).split())
 assert {"envs/dandi-validation/image", "code/submit.sh", "derivatives/summary.json", "sourcedata"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
-assert not any(path.startswith("pipeline-") or path == "dataset_description.json" for path in files), files
+assert not any(path.startswith("pipeline-") for path in files), files
+assert json.loads(git("show", f"{code}:dataset_description.json"))["DatasetType"] == "study"
 assert "[DATALAD RUNCMD]" in git("log", "--format=%s", code)
 # sourcedata/ links DANDI's DataLad mirror of the Dandiset at its draft head (never fetched).
 sourcedata = git("ls-tree", code, "sourcedata").split()
@@ -103,12 +113,20 @@ assert row["status"] == "successful", row
 summary = json.loads((capsule / "derivatives" / "summary.json").read_text())
 assert summary["files_streamed"] == row["assets"], (summary["files_streamed"], row["assets"])
 assert summary["files_missing_content"] == 0, summary
-print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
+
+if pathlib.Path(golden_manifest).is_dir():
+    # The golden example: its results must be exactly tests/expected_output/validated.
+    sys.path.insert(0, str(pathlib.Path(golden_manifest).parents[1]))
+    import golden
+
+    golden.check_validated(pathlib.Path(remote), code, pathlib.Path(work))
+else:
+    print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
 EOF
 
 git -C "$REMOTE" log --oneline main | head -n 5
 git -C "$REMOTE" log --oneline "$CODE" | head -n 5
 
 # A second run finds the successful capsule and does nothing.
-dandi-validations run --dandiset-id "$DANDISET_ID" --push origin | grep -q "already validated"
+dandi-validations run --dandiset-id "$DANDISET_ID" --push origin "${MANIFEST_ARGUMENTS[@]}" | grep -q "already validated"
 echo "End-to-end test passed."

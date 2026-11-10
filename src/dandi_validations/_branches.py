@@ -14,7 +14,7 @@ checked out at the path of its submodule in main. They all share that clone's ob
 git-annex, which is initialized as private: nothing about the ephemeral clone is recorded, and no
 git-annex branch is ever pushed.
 
-``main`` holds, besides the single ``dataset_description.json``, one git submodule
+``main`` holds, besides its ``dataset_description.json``, one git submodule
 ``pipeline-dandi+validate_tag-<tag>`` per capsule branch, pointing at the same repository and
 branch, pinned to the branch's latest commit. A branch that is deleted loses its submodule.
 """
@@ -23,7 +23,7 @@ import pathlib
 import re
 import uuid
 
-from ._capsule import Capsule, capsule_name, remove_capsule_provenance
+from ._capsule import Capsule, capsule_name
 from ._git import run
 from ._globals import DANDISETS_URL_TEMPLATE, SOURCEDATA_BRANCH
 from ._version_code import is_version_code
@@ -53,8 +53,8 @@ def datalad_dataset_files() -> dict[str, str]:
 
 
 def remote_url(root: pathlib.Path, remote: str) -> str | None:
-    """The remote's URL, without any credentials in it."""
-    result = run(["git", "remote", "get-url", remote], cwd=root, check=False)
+    """The remote's URL as configured (before any ``insteadOf`` rewriting), without credentials."""
+    result = run(["git", "config", "--get", f"remote.{remote}.url"], cwd=root, check=False)
     if result.returncode != 0:
         return None
     return re.sub(r"(://)[^/@]+@", r"\1", result.stdout.strip())
@@ -172,7 +172,6 @@ def prune_submodules(main_root: pathlib.Path, *, branches: set[str], pipeline: s
             continue
         run(["git", "config", "-f", ".gitmodules", "--remove-section", f"submodule.{name}"], cwd=main_root)
         run(["git", "update-index", "--force-remove", name], cwd=main_root)
-        remove_capsule_provenance(main_root, name)
         removed.append(name)
     if removed:
         gitmodules = main_root / ".gitmodules"
@@ -181,7 +180,6 @@ def prune_submodules(main_root: pathlib.Path, *, branches: set[str], pipeline: s
             gitmodules.unlink()
         else:
             run(["git", "add", ".gitmodules"], cwd=main_root)
-        run(["git", "add", "dataset_description.json"], cwd=main_root)
     return removed
 
 

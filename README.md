@@ -26,8 +26,9 @@ BIDS derivative dataset of its Dandiset:
 
 ```
 https://github.com/dandi-validations/{dandiset_id}/   (main)
-├── dataset_description.json  ← the derivative dataset, with every capsule's provenance
+├── dataset_description.json  ← the derivative dataset that collects the capsules
 └── pipeline-dandi+validate_tag-{tag}/  ← submodule: branch {tag} of this repository
+    ├── dataset_description.json  ← a study dataset: the provenance of its latest run
     ├── code/  ← assets.tsv, dandiset.yaml, name-default.json, run.sh,
     │            summarize.py, submit.sh, submitted_date-... (claim marker)
     ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
@@ -41,20 +42,25 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
   its image's tag, e.g. `d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2`. The branch holds `code/`,
   `logs/` and `derivatives/` at its root, the registration of its image
   (`envs/dandi-validation/image`, annexed, its content on GHCR), and the `[DATALAD RUNCMD]` record
-  of every run, so `datalad rerun` reproduces any of them. Branches are never merged. A capsule holds the latest validation of the Dandiset with its image: a new run
-  (after the Dandiset's files change, or a failure) replaces its contents in a new commit, so the
-  branch's history keeps every earlier run.
+  of every run, so `datalad rerun` reproduces any of them. Branches are never merged. A capsule
+  holds the latest validation of the Dandiset with its image: a new run (after the Dandiset's files
+  change, or a failure) replaces its contents in a new commit, so the branch's history keeps every
+  earlier run.
+- **Two `dataset_description.json`.** `main`'s describes the repository as a derivative dataset
+  collecting the capsules; the template sync manages it. Each capsule's describes the capsule as a
+  BIDS study dataset: it holds its raw data under `sourcedata/` and its results under
+  `derivatives/`. A job writes it with the provenance of the run:
+  - `GeneratedBy` names dandi-cli, the image in BIDS's `Container` (tag and digest), and this code.
+  - `SourceDatasets` names the Dandiset and the mirror commit `sourcedata/` pins.
+  - `DandiValidations` holds the run's inputs, image and six validator versions.
 - **sourcedata/** in each capsule is a subdataset (git submodule) of DANDI's DataLad mirror,
   `https://github.com/dandisets/{dandiset_id}`, pinned to its `draft` head when the run was
   formed. It is there for provenance and self-containment only: it is read with `git ls-remote`
   and never fetched, and the validation reads the Dandiset through the dataset built from the S3
   manifest.
-- **main** holds the repository's only `dataset_description.json` and one git submodule per tag
-  branch that has content, pointing at this same repository and branch, pinned to the branch's
-  latest commit. If a branch is deleted, the next run removes its submodule. `GeneratedBy` has an
-  entry per capsule naming its image in BIDS's `Container` (tag and digest), and the
-  `DandiValidations` key maps each capsule to the inputs, image and validator versions of its
-  latest run.
+- **main** holds one git submodule per tag branch that has content, pointing at this same
+  repository and branch, pinned to the branch's latest commit. If a branch is deleted, the next run
+  removes its submodule.
 - **Status** is read from what a capsule holds: *pending* (code only), *stalled* (claimed,
   nothing logged), *failed* (logs, no results), *successful* (results under `derivatives/`).
 - **One clone, one annex.** On a runner, every capsule branch is a `git worktree` of the single
@@ -84,8 +90,8 @@ workflow), `dandi-validations run`, from a checkout of `main`:
    links `sourcedata/` to the mirror's current `draft` head. Unless the capsule's
    latest run already succeeded on the same inputs, it writes the capsule's `code/`: the assets
    to validate (`assets.tsv`: path, size, SHA-256, S3 URL), `dandiset.yaml`, the parameters,
-   `run.sh` and `submit.sh`. It also resolves the image's digest on GHCR and records the capsule's
-   provenance in `main`'s `dataset_description.json`. The inputs are the Dandiset version, the
+   `run.sh` and `submit.sh`. It also resolves the image's digest on GHCR and writes the capsule's
+   `dataset_description.json` with its provenance. The inputs are the Dandiset version, the
    image's version code, the parameters and a digest of the assets and `dandiset.yaml`.
 2. **Claims it.** It commits the capsule to its branch and pushes the branch, then pins `main`'s
    submodule to it and pushes `main`. A run that never reports back therefore reads as *stalled*.
@@ -163,10 +169,10 @@ To update the image:
 | Workflow | What it does |
 | --- | --- |
 | **Build and publish container** | Builds the image for the version code of `pixi.lock` and pushes the OCI image, its SIF and its lock to GHCR, unless that code is already published. |
-| **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them; optionally dispatches their validation. It only starts `dataset_description.json`, which jobs maintain, and never touches capsule branches or submodules. |
+| **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them; optionally dispatches their validation. It never touches capsule branches or submodules. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
 | **Collect records** | Every 6 hours, reads every capsule of every repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`. |
-| **Tests** | Unit tests, and one real job end to end (Dandiset 000006) against a local bare repository. |
+| **Tests** | The tests, around one golden example (Dandiset 000006, see [`tests/README.md`](tests/README.md)): its expected repository contents and validation results are committed in `tests/expected_output/`, and one real job runs end to end. |
 
 ## Setting up
 

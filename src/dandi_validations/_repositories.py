@@ -19,7 +19,7 @@ import xml.etree.ElementTree
 import requests
 
 from ._branches import datalad_dataset_files
-from ._capsule import DATASET_DESCRIPTION, capsule_name
+from ._capsule import capsule_name
 from ._globals import (
     CODEBASE_URL,
     DANDI_API_URL,
@@ -248,10 +248,6 @@ def sync_repository(
     files = render_repository_template(dandiset_id=dandiset_id, codebase_ref=codebase_ref)
     if not (clone / ".datalad" / "config").exists():
         files.update({path: content.encode() for path, content in datalad_dataset_files().items()})
-    # Jobs keep the provenance of every capsule in dataset_description.json, so the template only
-    # starts it.
-    if (clone / DATASET_DESCRIPTION).exists():
-        files.pop(DATASET_DESCRIPTION)
     for relative, content in files.items():
         target = clone / relative
         target.parent.mkdir(parents=True, exist_ok=True)

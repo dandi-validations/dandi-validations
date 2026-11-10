@@ -53,4 +53,4 @@ select = ["F", "E", "I"]
 relative-imports-order = "closest-to-furthest"
 
 [tool.codespell]
-skip = "*.jsonld,*.tsv,*.lock"
+skip = "*.jsonld,*.tsv,*.lock,./tests/expected_output,./tests/example_dandiset"

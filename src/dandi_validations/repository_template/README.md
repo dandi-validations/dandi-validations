@@ -24,8 +24,9 @@ holds a submodule for each of those branches:
 
 ```
 https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
-├── dataset_description.json  ← the derivative dataset, with every capsule's provenance
+├── dataset_description.json  ← the derivative dataset that collects the capsules
 └── {{ capsule_pattern }}/  ← submodule: branch {tag} of this repository
+    ├── dataset_description.json  ← a study dataset: the provenance of its latest run
     ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters,
     │            dandiset.yaml and assets.tsv (the files that were validated)
     ├── logs/  ← all runtime records for success or failure: duct's usage and

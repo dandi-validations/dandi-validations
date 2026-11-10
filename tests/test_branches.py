@@ -1,135 +1,92 @@
+"""
+How capsule branches and main's submodules behave across jobs, on the golden example (Dandiset
+000006; see tests/README.md). What a claimed repository holds is test_golden_example.py's.
+"""
+
+import json
+import shutil
 import subprocess
 
-from dandi_validations._branches import (
-    capsule_branches,
-    checkout_capsule,
-    create_capsule,
-    link_sourcedata,
-    prune_submodules,
-    remote_heads,
-)
-from dandi_validations._capsule import (
-    PROVENANCE_KEY,
-    Capsule,
-    capsule_status,
-    is_up_to_date,
-    plan_capsule,
-    read_dataset_description,
-    write_capsule,
-)
+from dandi_validations._branches import capsule_branches, checkout_capsule, prune_submodules, remote_heads
+from dandi_validations._capsule import Capsule, capsule_status, read_provenance
 from dandi_validations._collect import collect
-from dandi_validations._git import ensure_annex
+from dandi_validations._pipeline import load_pipeline
 from dandi_validations._repositories import sync_repository
-from dandi_validations._run import _commit_and_publish
+from dandi_validations._run import _commit_and_publish, run_job
+
+from .golden import EXAMPLE_DANDISET_ID, EXAMPLE_MANIFEST_DIRECTORY, NOW, git, make_world
 
 
-def _git(*arguments, cwd):
-    return subprocess.run(["git", *arguments], cwd=cwd, capture_output=True, text=True, check=True).stdout
-
-
-def _main_clone(tmp_path, name):
-    """A Dandiset repository made by the template sync, cloned as a runner's checkout of main."""
-    remote = tmp_path / "remotes" / "000123.git"
-    if not remote.exists():
-        remote.parent.mkdir(parents=True)
-        _git("init", "--quiet", "--bare", "-b", "main", str(remote), cwd=tmp_path)
-        work = tmp_path / "sync"
-        work.mkdir()
-        sync_repository(dandiset_id="000123", remote_url=f"file://{remote}", codebase_ref="main", work_directory=work)
-    clone = tmp_path / name
-    _git("clone", "--quiet", f"file://{remote}", str(clone), cwd=tmp_path)
-    return remote, clone
-
-
-def _mirror(tmp_path):
-    """A stand-in for DANDI's DataLad mirror of the Dandiset (github.com/dandisets/000123)."""
-    mirror = tmp_path / "dandisets" / "000123.git"
-    if not mirror.exists():
-        work = tmp_path / "mirror-work"
-        _git("init", "--quiet", "-b", "draft", str(work), cwd=tmp_path)
-        (work / "dandiset.yaml").write_text("identifier: DANDI:000123\n")
-        _git("add", "dandiset.yaml", cwd=work)
-        _git("commit", "--quiet", "-m", "draft", cwd=work)
-        mirror.parent.mkdir(parents=True)
-        _git("clone", "--quiet", "--bare", str(work), str(mirror), cwd=tmp_path)
-    return mirror
-
-
-def _submit(main, assets_jsonld, dandiset_yaml):
-    """What a job does before running its capsule: check the branch out (or start it), write, publish."""
-    plan = plan_capsule(
-        repository_root=main, dandiset_id="000123", assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml
+def _claim(runner, manifest_directory=EXAMPLE_MANIFEST_DIRECTORY, **kwargs):
+    return run_job(
+        path=runner,
+        dandiset_id=EXAMPLE_DANDISET_ID,
+        push_to="origin",
+        manifest_directory=manifest_directory,
+        execute=False,
+        now=NOW,
+        **kwargs,
     )
-    ensure_annex(main, remote=None)
-    if not checkout_capsule(main, plan.capsule, "origin"):
-        create_capsule(main, plan.capsule)
-    mirrors = main.parent / "dandisets"
-    sourcedata = link_sourcedata(plan.capsule, url_template=f"file://{mirrors}/{{dandiset_id}}.git")
-    write_capsule(plan, sourcedata=sourcedata)
-    _commit_and_publish(
-        main, plan.capsule, paths=[plan.capsule.path], message="Submit", push_to="origin", branch="main"
+
+
+def _capsule(runner) -> Capsule:
+    pipeline = load_pipeline()
+    return Capsule(
+        repository_root=runner,
+        dandiset_id=EXAMPLE_DANDISET_ID,
+        pipeline=pipeline.pipeline,
+        tag=pipeline.container_version,
     )
-    return plan
 
 
-def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, assets_jsonld, dandiset_yaml):
-    remote, main = _main_clone(tmp_path, "runner")
-    mirror = _mirror(tmp_path)
-    plan = _submit(main, assets_jsonld, dandiset_yaml)
-    capsule = plan.capsule
+def _clone(world, name):
+    destination = world.runner.parent / name
+    git(
+        "clone",
+        "--quiet",
+        f"https://github.com/dandi-validations/{EXAMPLE_DANDISET_ID}",
+        str(destination),
+        cwd=world.runner.parent,
+    )
+    return destination
 
-    # The capsule is a worktree of main's clone: one object store and one git-annex for both. (git-annex
-    # turns a worktree's .git file into a symbolic link, so that annexed links resolve from it.)
+
+def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path, monkeypatch):
+    world = make_world(tmp_path, monkeypatch)
+    assert _claim(world.runner) == 0
+    capsule = _capsule(world.runner)
+
+    # One object store and one git-annex for main and the capsule. (git-annex turns a worktree's
+    # .git file into a symbolic link, so that annexed links resolve from it.)
     dot_git = capsule.path / ".git"
     assert dot_git.is_file() or dot_git.is_symlink()
-    assert str(capsule.path) in _git("worktree", "list", cwd=main)
-    common = _git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=capsule.path).strip()
-    assert common == str(main / ".git")
-
-    # The capsule is on the branch named exactly by the image's tag, with its contents at the root.
-    heads = remote_heads(main, "origin")
-    assert set(heads) == {"main", capsule.tag}
-    files = _git("ls-tree", "-r", "--name-only", capsule.tag, cwd=remote).split()
-    assert "code/submit.sh" in files and "code/assets.tsv" in files and ".datalad/config" in files
-    assert not any(path.startswith("pipeline-") or path == "dataset_description.json" for path in files)
-    assert _git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
-
-    # sourcedata/ links the mirror's draft head, as a subdataset that was never fetched.
-    mirror_draft = _git("rev-parse", "draft", cwd=mirror).strip()
-    assert _git("ls-tree", capsule.tag, "sourcedata", cwd=remote).split()[:3] == ["160000", "commit", mirror_draft]
-    capsule_gitmodules = _git("show", f"{capsule.tag}:.gitmodules", cwd=remote)
-    assert f"url = file://{mirror}" in capsule_gitmodules and "branch = draft" in capsule_gitmodules
+    assert str(capsule.path) in git("worktree", "list", cwd=world.runner)
+    assert git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
+    # sourcedata/ is linked, never fetched; no git-annex branch is pushed.
     assert not any((capsule.path / "sourcedata").iterdir())
+    assert set(remote_heads(world.runner, "origin")) == {"main", capsule.tag}
 
-    # main holds the single dataset_description.json and a submodule pinned to the branch's head.
-    main_files = _git("ls-tree", "--name-only", "main", cwd=remote).split()
-    assert {"dataset_description.json", ".gitmodules", capsule.name} <= set(main_files)
-    gitmodules = _git("show", "main:.gitmodules", cwd=remote)
-    assert f'[submodule "{capsule.name}"]' in gitmodules
-    assert f"path = {capsule.name}" in gitmodules and f"branch = {capsule.tag}" in gitmodules
-    assert f"url = file://{remote}" in gitmodules and "datalad-id = " in gitmodules
-    gitlink = _git("ls-tree", "main", capsule.name, cwd=remote).split()
-    assert gitlink[:3] == ["160000", "commit", heads[capsule.tag]]
-    description = read_dataset_description(main)
-    assert list(description[PROVENANCE_KEY]) == [capsule.name]
-    assert description[PROVENANCE_KEY][capsule.name]["branch"] == capsule.tag
-    assert description[PROVENANCE_KEY][capsule.name]["sourcedata"]["commit"] == mirror_draft
 
-    # Another runner gets the capsule back from its branch; git can clone it as a submodule too.
-    _, other = _main_clone(tmp_path, "other-runner")
-    other_capsule = Capsule(repository_root=other, dandiset_id="000123", pipeline=capsule.pipeline, tag=capsule.tag)
+def test_another_runner_gets_the_capsule_back(tmp_path, monkeypatch):
+    world = make_world(tmp_path, monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+
+    other = _clone(world, "other-runner")
+    other_capsule = _capsule(other)
     assert checkout_capsule(other, other_capsule, "origin")
     assert capsule_status(other_capsule.path) == "stalled"
+    assert read_provenance(other_capsule.path) == read_provenance(capsule.path)
+
+    # git itself can clone the capsules and their sourcedata/ from main's submodules.
     recursive = tmp_path / "recursive"
     subprocess.run(
         [
             "git",
-            "-c",
-            "protocol.file.allow=always",
             "clone",
             "--quiet",
             "--recurse-submodules",
-            f"file://{remote}",
+            f"https://github.com/dandi-validations/{EXAMPLE_DANDISET_ID}",
             str(recursive),
         ],
         check=True,
@@ -137,52 +94,80 @@ def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, 
     assert (recursive / capsule.name / "code" / "submit.sh").exists()
     assert (recursive / capsule.name / "sourcedata" / "dandiset.yaml").exists()
 
-    # The collect step reads the capsule through main's submodules.
-    collect(
-        dandiset_ids=["000123"],
-        output_directory=tmp_path / "records",
-        clone_url_template=f"file://{tmp_path}/remotes/{{repository}}.git",
-    )
-    rows = (tmp_path / "records" / "capsules.tsv").read_text().splitlines()
-    assert len(rows) == 2 and f"\t{capsule.name}\tstalled\t" in rows[1]
 
+def test_reruns_skip_unchanged_inputs_and_add_to_the_branch(tmp_path, monkeypatch, capsys):
+    world = make_world(tmp_path, monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    first_head = remote_heads(world.runner, "origin")[capsule.tag]
 
-def test_rerun_adds_to_the_branch_and_repins_main(tmp_path, assets_jsonld, dandiset_yaml):
-    remote, main = _main_clone(tmp_path, "runner")
-    _mirror(tmp_path)
-    first = _submit(main, assets_jsonld, dandiset_yaml)
-    first_head = remote_heads(main, "origin")[first.capsule.tag]
-
-    # Pretend the run succeeded and was recorded, so the same inputs are up to date.
-    capsule = first.capsule
+    # Record a successful run, as a job does after the container exits.
     capsule.derivatives_directory.mkdir()
     (capsule.derivatives_directory / "summary.json").write_text("{}")
-    _commit_and_publish(main, capsule, paths=[capsule.path], message="Record", push_to="origin", branch="main")
-    _, next_runner = _main_clone(tmp_path, "next-runner")
-    again = plan_capsule(
-        repository_root=next_runner, dandiset_id="000123", assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml
-    )
-    assert checkout_capsule(next_runner, again.capsule, "origin") and is_up_to_date(again)
+    _commit_and_publish(world.runner, capsule, paths=[capsule.path], message="Record", push_to="origin", branch="main")
 
-    # Changed content forms a new run on the same branch, which keeps the earlier commits.
-    changed = _submit(next_runner, assets_jsonld, dandiset_yaml + b"description: changed\n")
-    new_head = remote_heads(next_runner, "origin")[changed.capsule.tag]
+    # Another runner skips the same inputs.
+    other = _clone(world, "other-runner")
+    assert _claim(other) == 0
+    assert "already validated these inputs" in capsys.readouterr().out
+
+    # Changed content is a new run on the same branch, which keeps the earlier commits, and main
+    # is pinned to its new head.
+    changed_manifest = tmp_path / "changed-manifest"
+    shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
+    with (changed_manifest / "dandiset.yaml").open("a") as stream:
+        stream.write("description: changed\n")
+    assert _claim(other, manifest_directory=changed_manifest) == 0
+    new_head = remote_heads(other, "origin")[capsule.tag]
     assert new_head != first_head
-    history = _git("rev-list", changed.capsule.tag, cwd=remote).split()
-    assert first_head in history
-    assert _git("ls-tree", "main", changed.capsule.name, cwd=remote).split()[2] == new_head
-    assert not (changed.capsule.derivatives_directory).exists()
+    assert first_head in git("rev-list", capsule.tag, cwd=world.repository).split()
+    assert git("ls-tree", "main", capsule.name, cwd=world.repository).split()[2] == new_head
+    assert git("ls-tree", "-r", "--name-only", capsule.tag, "derivatives", cwd=world.repository) == ""
 
 
-def test_deleted_branches_lose_their_submodule(tmp_path, assets_jsonld, dandiset_yaml):
-    remote, main = _main_clone(tmp_path, "runner")
-    _mirror(tmp_path)
-    plan = _submit(main, assets_jsonld, dandiset_yaml)
-    _git("push", "--quiet", "origin", f":refs/heads/{plan.capsule.tag}", cwd=main)
+def test_deleted_branches_lose_their_submodule(tmp_path, monkeypatch):
+    world = make_world(tmp_path, monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    git("push", "--quiet", "origin", f":refs/heads/{capsule.tag}", cwd=world.runner)
 
-    removed = prune_submodules(main, branches=capsule_branches(main, "origin"), pipeline=plan.capsule.pipeline)
-    assert removed == [plan.capsule.name]
-    assert not (main / ".gitmodules").exists()
-    assert read_dataset_description(main)[PROVENANCE_KEY] == {}
-    staged = _git("diff", "--cached", "--name-only", cwd=main).split()
-    assert {".gitmodules", plan.capsule.name, "dataset_description.json"} <= set(staged)
+    removed = prune_submodules(
+        world.runner, branches=capsule_branches(world.runner, "origin"), pipeline=capsule.pipeline
+    )
+    assert removed == [capsule.name]
+    assert not (world.runner / ".gitmodules").exists()
+    staged = git("diff", "--cached", "--name-only", cwd=world.runner).split()
+    assert {".gitmodules", capsule.name} <= set(staged)
+
+
+def test_collect_reads_capsules_through_mains_submodules(tmp_path, monkeypatch):
+    world = make_world(tmp_path, monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+
+    written = collect(dandiset_ids=[EXAMPLE_DANDISET_ID, "999999"], output_directory=tmp_path / "records")
+    rows = (tmp_path / "records" / "capsules.tsv").read_text().splitlines()
+    assert len(rows) == 2  # 999999 has no repository: skipped with a warning
+    row = dict(zip(rows[0].split("\t"), rows[1].split("\t")))
+    assert row["capsule"] == capsule.name and row["status"] == "stalled" and row["assets"] == "53"
+    assert json.loads((tmp_path / "records" / "capsules.json").read_text())["status"]["Levels"]
+    assert [path.name for path in written] == ["capsules.tsv", "capsules.json"]
+
+
+def test_template_sync_keeps_mains_submodules(tmp_path, monkeypatch):
+    world = make_world(tmp_path, monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    before = git("ls-tree", "main", capsule.name, cwd=world.repository)
+
+    work = tmp_path / "resync"
+    work.mkdir()
+    assert sync_repository(
+        dandiset_id=EXAMPLE_DANDISET_ID,
+        remote_url=f"https://github.com/dandi-validations/{EXAMPLE_DANDISET_ID}",
+        codebase_ref="v2",
+        work_directory=work,
+    )
+    assert "setup@v2" in git("show", "main:.github/workflows/validate.yml", cwd=world.repository)
+    assert git("ls-tree", "main", capsule.name, cwd=world.repository) == before
+    assert f"branch = {capsule.tag}" in git("show", "main:.gitmodules", cwd=world.repository)

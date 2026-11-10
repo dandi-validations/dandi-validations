@@ -63,6 +63,13 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--branch", default=None, help="Branch to push to (default: main).")
     run_parser.add_argument("--time-limit-minutes", type=float, default=0, help="Stop the run after this long.")
     run_parser.add_argument("--path", type=pathlib.Path, default=pathlib.Path.cwd())
+    run_parser.add_argument(
+        "--manifest-directory",
+        type=pathlib.Path,
+        default=None,
+        help="Read assets.jsonld and dandiset.yaml from here instead of the archive's S3 bucket.",
+    )
+    run_parser.add_argument("--claim-only", action="store_true", help="Form and claim the capsule, but do not run it.")
 
     prepare_parser = commands.add_parser("prepare", help="Only form the job capsule (do not run it).")
     prepare_parser.add_argument("--dandiset-id", required=True)
@@ -121,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
             push_to=arguments.push,
             branch=arguments.branch,
             time_limit_minutes=arguments.time_limit_minutes,
+            manifest_directory=arguments.manifest_directory,
+            execute=not arguments.claim_only,
         )
 
     if arguments.command == "prepare":

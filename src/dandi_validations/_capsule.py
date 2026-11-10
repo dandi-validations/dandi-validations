@@ -2,14 +2,17 @@
 Capsules: one per image tag in each Dandiset repository.
 
 Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its Dandiset. Its
-``main`` branch holds the single ``dataset_description.json`` and one submodule per capsule::
+``main`` branch holds its ``dataset_description.json`` and one submodule per capsule::
 
     https://github.com/dandi-validations/{dandiset_id}/   (main)
-    ├── dataset_description.json  ← the derivative dataset, with every capsule's provenance
+    ├── dataset_description.json  ← the derivative dataset that collects the capsules
     └── pipeline-dandi+validate_tag-{tag}/  ← submodule: this repository's branch {tag}
+        ├── dataset_description.json  ← a study dataset: the provenance of its latest run
         ├── code/  ← the exact code and inputs of its latest run
         ├── logs/  ← all runtime records of that run, for success or failure
-        └── derivatives/  ← the validation results (only for a completed run)
+        ├── derivatives/  ← the validation results (only for a completed run)
+        ├── envs/  ← the image's registration
+        └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset (see ``_branches``)
 
 ``{tag}`` is the dandi-validation image's tag: its validator version code. Each capsule is a
 DataLad dataset on the branch named by that tag (see ``_branches``). It holds the latest
@@ -17,9 +20,9 @@ validation of the Dandiset with that image; a new run with the same image (after
 files change, or a failure) replaces its contents in a new commit on the branch, so earlier runs
 remain in the branch's history, each with its ``datalad run`` record.
 
-``dataset_description.json`` has a ``GeneratedBy`` entry per capsule naming its image
-(``Container``), and its ``DandiValidations`` key maps each capsule to the inputs and image of its
-latest run.
+A capsule's ``dataset_description.json`` (``DatasetType`` "study") names its image in
+``GeneratedBy`` (``Container``, with tag and digest), the Dandiset and the pinned mirror commit in
+``SourceDatasets``, and the inputs of its latest run under ``DandiValidations``.
 
 A capsule's lifecycle status is read from what it contains, as DANDI Compute does: ``pending``
 (code only), ``stalled`` (submitted but nothing logged), ``failed`` (logs without results) and
@@ -164,79 +167,73 @@ def claim_identifier() -> str:
 
 
 # --------------------------------------------------------------------------------------------- #
-# The repository's dataset_description.json
+# The capsule's dataset_description.json
 # --------------------------------------------------------------------------------------------- #
-def read_dataset_description(repository_root: pathlib.Path) -> dict:
-    file_path = repository_root / DATASET_DESCRIPTION
+def read_dataset_description(directory: pathlib.Path) -> dict:
+    file_path = directory / DATASET_DESCRIPTION
     return json.loads(file_path.read_text()) if file_path.exists() else {}
 
 
 def read_provenance(capsule_directory: pathlib.Path) -> dict:
-    """The provenance of a capsule's latest run, from the repository's dataset_description.json."""
-    description = read_dataset_description(capsule_directory.parent)
-    return description.get(PROVENANCE_KEY, {}).get(capsule_directory.name, {})
+    """The provenance of a capsule's latest run, from its own dataset_description.json."""
+    return read_dataset_description(capsule_directory).get(PROVENANCE_KEY, {})
 
 
-def _generated_by(provenances: dict[str, dict]) -> list[dict]:
-    """``GeneratedBy``: the orchestration code, then one entry per capsule naming its image."""
-    latest = max(provenances.values(), key=lambda provenance: provenance.get("created_at", ""), default={})
-    entries = [
+def capsule_dataset_description(capsule: "Capsule", pipeline: Pipeline, provenance: dict) -> dict:
+    """
+    The capsule's dataset_description.json: a BIDS study dataset of its latest run.
+
+    A study dataset holds the raw data it was derived from under ``sourcedata/`` (here, DANDI's
+    DataLad mirror of the Dandiset) and the results under ``derivatives/``.
+    """
+    digest = provenance["image_digest"]
+    sourcedata = provenance.get("sourcedata")
+    source_datasets = [
         {
-            "Name": "DANDI Validations",
-            "Description": "Runs dandi validate per Dandiset on GitHub Actions and records each run in a capsule.",
-            "Version": latest.get("codebase_version", "unknown"),
-            "CodeURL": CODEBASE_URL,
+            "URL": f"{DANDI_ARCHIVE_URL}/dandiset/{capsule.dandiset_id}/{provenance['dandiset_version']}",
+            "Version": provenance["dandiset_version"],
         }
     ]
-    for name, provenance in sorted(provenances.items()):
-        tag = provenance.get("version", "")
-        digest = provenance.get("image_digest")
-        image = provenance.get("image", "")
-        repository = image.rsplit(":", 1)[0]
-        dandi_cli = provenance.get("dandi_cli", {})
-        entries.append(
+    if sourcedata is not None:
+        source_datasets.append({"URL": sourcedata["url"], "Version": sourcedata["commit"]})
+    return {
+        "Name": f"DANDI Validations: dandi validate of Dandiset {capsule.dandiset_id} with {pipeline.image_reference}",
+        "BIDSVersion": "1.10.1",
+        "DatasetType": "study",
+        "GeneratedBy": [
             {
                 "Name": "dandi validate",
                 "Description": (
-                    f"Recorded in {name}/ (branch {tag}). DANDI CLI validation, streaming the content of annexed "
-                    f"files through datalad-fuse adapters ({dandi_cli.get('reference', '')}), run with Apptainer "
-                    "through datalad containers-run."
+                    "DANDI CLI validation, streaming the content of annexed files through datalad-fuse "
+                    f"adapters ({provenance['dandi_cli']['reference']})."
                 ),
-                "Version": tag,
-                "CodeURL": dandi_cli.get("code_url", ""),
+                "Version": pipeline.dandi_cli_commit,
+                "CodeURL": pipeline.dandi_cli_code_url,
+            },
+            {
+                "Name": "DANDI Validations: Container",
+                "Description": (
+                    "The dandi-validation image, tagged by its validator version code, run through Apptainer "
+                    "with datalad containers-run."
+                ),
+                "Version": pipeline.container_version,
+                "CodeURL": f"{pipeline.image_reference}@{digest}" if digest else pipeline.image_reference,
                 "Container": {
                     "Type": "docker",
-                    "Tag": tag,
-                    "URI": f"docker://{repository}@{digest}" if digest else f"docker://{image}",
+                    "Tag": pipeline.container_version,
+                    "URI": pipeline.docker_url(digest),
                 },
-            }
-        )
-    return entries
-
-
-def _write_provenances(repository_root: pathlib.Path, description: dict, provenances: dict[str, dict]) -> None:
-    description["DatasetType"] = "derivative"
-    description["GeneratedBy"] = _generated_by(provenances)
-    description[PROVENANCE_KEY] = dict(sorted(provenances.items()))
-    (repository_root / DATASET_DESCRIPTION).write_text(json.dumps(description, indent=2) + "\n")
-
-
-def write_capsule_provenance(repository_root: pathlib.Path, name: str, provenance: dict) -> None:
-    """Record a capsule's provenance in the repository's single dataset_description.json."""
-    description = read_dataset_description(repository_root)
-    description.setdefault("Name", f"DANDI Validations: Dandiset {provenance['dandiset_id']}")
-    description.setdefault("BIDSVersion", "1.10.1")
-    description.setdefault("SourceDatasets", [{"URL": f"{DANDI_ARCHIVE_URL}/dandiset/{provenance['dandiset_id']}"}])
-    provenances = dict(description.get(PROVENANCE_KEY, {}))
-    provenances[name] = provenance
-    _write_provenances(repository_root, description, provenances)
-
-
-def remove_capsule_provenance(repository_root: pathlib.Path, name: str) -> None:
-    description = read_dataset_description(repository_root)
-    provenances = dict(description.get(PROVENANCE_KEY, {}))
-    if provenances.pop(name, None) is not None:
-        _write_provenances(repository_root, description, provenances)
+            },
+            {
+                "Name": "DANDI Validations: Code",
+                "Description": "Orchestration of validation jobs on GitHub Actions.",
+                "Version": provenance["codebase_version"],
+                "CodeURL": CODEBASE_URL,
+            },
+        ],
+        "SourceDatasets": source_datasets,
+        PROVENANCE_KEY: provenance,
+    }
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -379,7 +376,8 @@ def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None, so
         "codebase_version": _codebase_version(),
         "created_at": now.replace(microsecond=0).isoformat(),
     }
-    write_capsule_provenance(capsule.repository_root, capsule.name, provenance)
+    description = capsule_dataset_description(capsule, pipeline, provenance)
+    (capsule.path / DATASET_DESCRIPTION).write_text(json.dumps(description, indent=2) + "\n")
 
 
 def prepare_capsule(

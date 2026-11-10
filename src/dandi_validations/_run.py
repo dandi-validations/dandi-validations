@@ -21,7 +21,7 @@ from ._branches import (
     register_submodule,
     remote_url,
 )
-from ._capsule import DATASET_DESCRIPTION, Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
+from ._capsule import Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
 from ._git import ensure_annex, push, repository_root, run
 from ._globals import DEFAULT_BRANCH, DEFAULT_PARAMS_KEY
 
@@ -93,6 +93,9 @@ def run_job(
     push_to: str | None = None,
     branch: str | None = None,
     time_limit_minutes: float = 0,
+    manifest_directory: pathlib.Path | None = None,
+    execute: bool = True,
+    now: datetime.datetime | None = None,
 ) -> int:
     """
     Validate a Dandiset in the capsule of the pinned image, from a clone of the repository's main.
@@ -100,6 +103,10 @@ def run_job(
     The capsule's branch is checked out (or started) as a worktree of this clone, its run is
     committed to it, and main's submodule for it is pinned to the result, both when the run is
     claimed and when it is recorded. With ``push_to``, both branches are pushed at each point.
+
+    ``manifest_directory`` holds the Dandiset's ``assets.jsonld`` and ``dandiset.yaml`` to use
+    instead of the archive's current ones on S3 (e.g. a frozen copy, to rerun a capsule or test).
+    Without ``execute``, the capsule is only formed and claimed, not run.
     """
     root = repository_root(path)
     branch = branch or DEFAULT_BRANCH
@@ -107,8 +114,18 @@ def run_job(
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
     ensure_annex(root, remote=None)
 
+    manifest = {}
+    if manifest_directory is not None:
+        manifest = {
+            "assets_jsonld": (manifest_directory / "assets.jsonld").read_bytes(),
+            "dandiset_yaml": (manifest_directory / "dandiset.yaml").read_bytes(),
+        }
     plan = plan_capsule(
-        repository_root=root, dandiset_id=dandiset_id, dandiset_version=dandiset_version, params_key=params_key
+        repository_root=root,
+        dandiset_id=dandiset_id,
+        dandiset_version=dandiset_version,
+        params_key=params_key,
+        **manifest,
     )
     if isinstance(plan, str):
         print(plan, flush=True)
@@ -123,7 +140,7 @@ def run_job(
     sourcedata = link_sourcedata(capsule)
     if sourcedata is None:
         print(f"Dandiset {dandiset_id} has no DataLad mirror to link as sourcedata/.", flush=True)
-    write_capsule(plan, sourcedata=sourcedata)
+    write_capsule(plan, sourcedata=sourcedata, now=now)
     print(f"Formed {capsule.name} for {plan.number_of_assets} assets.", flush=True)
 
     # Claim the capsule before running it, so that a run that never reports back reads as stalled.
@@ -136,6 +153,9 @@ def run_job(
         push_to=push_to,
         branch=branch,
     )
+    if not execute:
+        print(f"{capsule.name}: claimed, not run.", flush=True)
+        return 0
 
     started_at = datetime.datetime.now(tz=datetime.timezone.utc)
     exit_code = _execute(
@@ -188,6 +208,6 @@ def _commit_and_publish(
         commit = run(["git", "rev-parse", f"refs/heads/{capsule.tag}"], cwd=root).stdout.strip()
         url = remote_url(root, "origin") or f"./{capsule.name}"
     register_submodule(root, capsule, url=url, commit=commit)
-    commit_main(root, [DATASET_DESCRIPTION], message)
+    commit_main(root, [], message)
     if push_to:
         push(root, remote=push_to, branch=branch)
