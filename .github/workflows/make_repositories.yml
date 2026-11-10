@@ -20,7 +20,10 @@ on:
         type: string
         default: ""
       codebase_ref:
-        description: Ref of this repository that the Dandiset repositories' workflows use
+        description: >-
+          Branch, tag, or full 40-character commit SHA of this repository that the Dandiset
+          repositories' workflows use. A short SHA does not work. A branch is followed to its latest
+          commit on every run, while a commit SHA pins them.
         type: string
         default: main
       dispatch:
