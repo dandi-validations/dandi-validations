@@ -15,9 +15,8 @@ It has one directory per branch:
 - [`d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2/`](expected_output/d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2) is the capsule's branch, named by the image's tag. It is a study dataset with these side by side:
   - `code/` holds the capsule's code and inputs.
   - `logs/` holds duct's records (`duct_info.json`, `duct_usage.jsonl`, `duct_stdout`, `duct_stderr`), the image's versions (`container_versions.json`), the run's record (`run.json`) and the output of `submit.sh` (`submit.log`).
-  - `derivatives/` holds every result in `validation.jsonl`.
-    `dandi validate` writes them in whatever order its workers finish, so they are compared sorted by file, then issue.
-    Its `--summary` lands in `logs/duct_stderr`.
+  - `derivatives/` holds every result in `validation.jsonl`, and their counts by severity, validator and standard in `validation_summary.txt` (`dandi validate --summary`).
+    `dandi validate` writes the results in whatever order its workers finish, so they are compared sorted by file, then issue.
   - `sourcedata` links DANDI's DataLad mirror of the Dandiset.
   - `envs/` registers the image.
 
@@ -69,4 +68,4 @@ It covers other runners, reruns, deleted branches, the template sync and the col
 ## Unit tests
 
 The other test files check single functions on small synthetic inputs (see [`conftest.py`](conftest.py)).
-They cover version codes, manifests, templates, the summary, the capsule table, and capsule behavior without git.
+They cover version codes, manifests, templates, the command line, the capsule table, and capsule behavior without git.

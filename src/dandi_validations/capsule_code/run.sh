@@ -13,7 +13,8 @@
 #   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
 #   3. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
-#      directory. Its --summary prints the counts by severity, validator and standard to the logs.
+#      directory, with dandi validate's --summary of them: the counts by severity, validator and
+#      standard. The summary is also printed to the logs.
 #
 # `dandi validate` exits 1 whenever it reports an error-level issue, which is a successful
 # validation here. It writes --output only once every file has been validated, so the
@@ -30,6 +31,7 @@ INTERMEDIATE_DIRECTORY="${CAPSULE_DIRECTORY}/intermediate"
 OUTPUT_DIRECTORY="${CAPSULE_DIRECTORY}/derivatives"
 SOURCE_DATASET="${INTERMEDIATE_DIRECTORY}/${DANDISET_ID}"
 RESULTS_FILE="${INTERMEDIATE_DIRECTORY}/validation.jsonl"
+SUMMARY_FILE="${INTERMEDIATE_DIRECTORY}/validation_summary.txt"
 
 parameter() {
     python -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$PARAMETERS_FILE" "$1"
@@ -84,6 +86,23 @@ if [ ! -f "$RESULTS_FILE" ] || [ "$validate_status" -gt 1 ]; then
     exit $(( validate_status == 0 ? 1 : validate_status ))
 fi
 
+echo "=== Summarizing results ==="
+# Reloaded with --summary, dandi validate prints the summary last, after the results rendered as
+# text, of which --max-per-group 0 shows none. Only the summary is kept.
+summary_status=0
+dandi validate \
+    --load "$RESULTS_FILE" \
+    --min-severity "$MIN_SEVERITY" \
+    --max-per-group 0 \
+    --summary \
+    > "${INTERMEDIATE_DIRECTORY}/summary_output.txt" \
+    || summary_status=$?
+if [ "$summary_status" -gt 1 ]; then
+    echo "dandi validate could not summarize the results (exit code ${summary_status})." >&2
+    exit "$summary_status"
+fi
+sed -n '/^--- Validation Summary ---$/,$p' "${INTERMEDIATE_DIRECTORY}/summary_output.txt" > "$SUMMARY_FILE"
+
 echo "=== Writing results ==="
 # The results are kept in git, uncompressed, so that they can be read on GitHub, which refuses
 # any file over 100 MiB. Larger results are not recorded, and the capsule is left failed.
@@ -94,3 +113,4 @@ if [ "$RESULTS_BYTES" -ge 104857600 ]; then
 fi
 mkdir -p "$OUTPUT_DIRECTORY"
 cp "$RESULTS_FILE" "${OUTPUT_DIRECTORY}/validation.jsonl"
+cp "$SUMMARY_FILE" "${OUTPUT_DIRECTORY}/validation_summary.txt"

@@ -25,7 +25,8 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
     │            submit.sh, submitted_date-... (claim marker)
     ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
     │            container_versions.json, run.json, submit.log
-    ├── derivatives/  ← validation.jsonl, as `dandi validate` writes it (plain text)
+    ├── derivatives/  ← validation.jsonl, as `dandi validate` writes it (plain text),
+    │                   and validation_summary.txt, its `--summary`
     ├── envs/dandi-validation/image  ← the image's registration (annexed, with its content on GHCR)
     └── sourcedata/  ← subdataset: https://github.com/dandisets/{dandiset_id} at its draft head
 ```

@@ -112,7 +112,8 @@ assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] =
 # The branch named by the tag: the capsule at its root (a study dataset), its image's registration
 # and its run record.
 files = set(git("ls-tree", "-r", "--name-only", code).split())
-assert {"envs/dandi-validation/image", "code/submit.sh", "derivatives/validation.jsonl", "sourcedata"} <= files
+assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata"} <= files
+assert {"derivatives/validation.jsonl", "derivatives/validation_summary.txt"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") for path in files), files
 assert json.loads(git("show", f"{code}:dataset_description.json"))["DatasetType"] == "study"
