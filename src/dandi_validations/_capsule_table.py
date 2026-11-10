@@ -6,7 +6,6 @@ repository's ``records/capsules.tsv``, with a ``capsules.json`` sidecar describi
 BIDS-style.
 """
 
-import gzip
 import json
 import pathlib
 
@@ -111,8 +110,6 @@ def sidecar_bytes() -> bytes:
 
 
 def read_table(content: bytes) -> list[dict]:
-    if content[:2] == b"\x1f\x8b":
-        content = gzip.decompress(content)
     lines = content.decode("utf-8").splitlines()
     if not lines:
         return []

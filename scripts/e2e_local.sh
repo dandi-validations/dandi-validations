@@ -85,14 +85,19 @@ assert f"branch = {code}" in git("show", "main:.gitmodules")
 assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] == "derivative"
 # The branch named by the tag: the capsule at its root, its image's registration and its run record.
 files = set(git("ls-tree", "-r", "--name-only", code).split())
-assert {".datalad/environments/dandi-validation/image", "code/submit.sh", "derivatives/summary.json"} <= files
+assert {"envs/dandi-validation/image", "code/submit.sh", "derivatives/summary.json", "sourcedata"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") or path == "dataset_description.json" for path in files), files
 assert "[DATALAD RUNCMD]" in git("log", "--format=%s", code)
+# sourcedata/ links DANDI's DataLad mirror of the Dandiset at its draft head (never fetched).
+sourcedata = git("ls-tree", code, "sourcedata").split()
+assert sourcedata[:2] == ["160000", "commit"], sourcedata
+assert "url = https://github.com/dandisets/" in git("show", f"{code}:.gitmodules")
 
 capsule = pathlib.Path.cwd() / name
 provenance = read_provenance(capsule)
 assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] == digest, provenance
+assert provenance["sourcedata"]["commit"] == sourcedata[2], provenance["sourcedata"]
 row = capsule_row(capsule)
 assert row["status"] == "successful", row
 summary = json.loads((capsule / "derivatives" / "summary.json").read_text())

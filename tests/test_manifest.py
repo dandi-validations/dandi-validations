@@ -1,5 +1,3 @@
-import gzip
-
 import pytest
 
 from dandi_validations import _manifest
@@ -8,7 +6,6 @@ from dandi_validations._manifest import (
     parse_assets_jsonld,
     select_assets,
     source_digest,
-    write_table,
 )
 
 from .conftest import make_asset
@@ -52,15 +49,6 @@ def test_tables_reject_tabs():
     rows, _ = select_assets([asset])
     with pytest.raises(ValueError):
         assets_table_bytes(rows)
-
-
-def test_large_tables_are_gzipped(tmp_path, monkeypatch):
-    monkeypatch.setattr(_manifest, "GZIP_TABLE_ABOVE_BYTES", 10)
-    written = write_table(b"a\tb\n" * 10, tmp_path / "assets.tsv")
-    assert written.name == "assets.tsv.gz"
-    assert gzip.decompress(written.read_bytes()) == b"a\tb\n" * 10
-    small = write_table(b"a\n", tmp_path / "small.tsv")
-    assert small.name == "small.tsv" and small.read_bytes() == b"a\n"
 
 
 def test_source_digest_depends_on_assets_and_metadata():

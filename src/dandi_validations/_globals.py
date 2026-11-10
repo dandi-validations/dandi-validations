@@ -25,6 +25,11 @@ S3_BASE_URL = "https://dandiarchive.s3.amazonaws.com"
 ASSETS_JSONLD_URL_TEMPLATE = S3_BASE_URL + "/dandisets/{dandiset_id}/{version}/assets.jsonld"
 DANDISET_YAML_URL_TEMPLATE = S3_BASE_URL + "/dandisets/{dandiset_id}/{version}/dandiset.yaml"
 
+#: DANDI's DataLad mirror of each Dandiset, which every capsule links as its ``sourcedata/``
+#: subdataset (for provenance and self-containment; the validation does not read it).
+DANDISETS_URL_TEMPLATE = "https://github.com/dandisets/{dandiset_id}"
+SOURCEDATA_BRANCH = "draft"
+
 #: Key of the capsules' provenance in a Dandiset repository's ``dataset_description.json``.
 PROVENANCE_KEY = "DandiValidations"
 

@@ -36,7 +36,6 @@ parameter() {
 MISSING_FILE_CONTENT="$(parameter missing_file_content)"
 JOBS="$(parameter jobs)"
 MIN_SEVERITY="$(parameter min_severity)"
-COMPRESS_RESULTS_ABOVE_BYTES="$(parameter compress_results_above_bytes)"
 
 export DANDI_NO_ET=1
 
@@ -58,10 +57,6 @@ python -c \
 
 echo "=== Building the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="
 ASSETS_TABLE="${CODE_DIRECTORY}/assets.tsv"
-if [ -f "${ASSETS_TABLE}.gz" ]; then
-    gzip -dc "${ASSETS_TABLE}.gz" > "${INTERMEDIATE_DIRECTORY}/assets.tsv"
-    ASSETS_TABLE="${INTERMEDIATE_DIRECTORY}/assets.tsv"
-fi
 datalad create -c text2git "$SOURCE_DATASET"
 cp "${CODE_DIRECTORY}/dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
 datalad save -d "$SOURCE_DATASET" -m "Add dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
@@ -88,15 +83,18 @@ if [ ! -f "$RESULTS_FILE" ] || [ "$validate_status" -gt 1 ]; then
 fi
 
 echo "=== Writing results ==="
+# The results are kept in git, uncompressed, so that they can be read on GitHub, which refuses
+# any file over 100 MiB. Larger results are not recorded, and the capsule is left failed.
+RESULTS_BYTES="$(stat -c %s "$RESULTS_FILE")"
+if [ "$RESULTS_BYTES" -ge 104857600 ]; then
+    echo "The results (${RESULTS_BYTES} bytes) exceed GitHub's 100 MiB limit for a file; they are not recorded." >&2
+    exit 3
+fi
 mkdir -p "$OUTPUT_DIRECTORY"
 python "${CODE_DIRECTORY}/summarize.py" \
     --results "$RESULTS_FILE" \
     --dandiset-path "$SOURCE_DATASET" \
     --exit-code "$validate_status" \
     --output "${OUTPUT_DIRECTORY}/summary.json"
-if [ "$(stat -c %s "$RESULTS_FILE")" -gt "$COMPRESS_RESULTS_ABOVE_BYTES" ]; then
-    gzip -n -c "$RESULTS_FILE" > "${OUTPUT_DIRECTORY}/validation.jsonl.gz"
-else
-    cp "$RESULTS_FILE" "${OUTPUT_DIRECTORY}/validation.jsonl"
-fi
+cp "$RESULTS_FILE" "${OUTPUT_DIRECTORY}/validation.jsonl"
 cat "${OUTPUT_DIRECTORY}/summary.json"

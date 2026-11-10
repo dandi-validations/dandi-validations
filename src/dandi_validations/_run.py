@@ -12,15 +12,17 @@ import sys
 from ._branches import (
     capsule_branches,
     checkout_capsule,
+    commit_capsule,
     commit_main,
     create_capsule,
+    link_sourcedata,
     prune_submodules,
     publish_capsule,
     register_submodule,
     remote_url,
 )
 from ._capsule import DATASET_DESCRIPTION, Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
-from ._git import ensure_annex, push, repository_root, run, save
+from ._git import ensure_annex, push, repository_root, run
 from ._globals import DEFAULT_BRANCH, DEFAULT_PARAMS_KEY
 
 _log = logging.getLogger(__name__)
@@ -95,13 +97,15 @@ def run_job(
     """
     Validate a Dandiset in the capsule of the pinned image, from a clone of the repository's main.
 
-    The capsule's branch is fetched (or started), its run is committed to it, and main's
-    submodule for it is pinned to the result, both when the run is claimed and when it is recorded.
-    With ``push_to``, both branches are pushed at each of those points.
+    The capsule's branch is checked out (or started) as a worktree of this clone, its run is
+    committed to it, and main's submodule for it is pinned to the result, both when the run is
+    claimed and when it is recorded. With ``push_to``, both branches are pushed at each point.
     """
     root = repository_root(path)
     branch = branch or DEFAULT_BRANCH
     remote = push_to or "origin"
+    # One git-annex for main and every capsule worktree, private to this ephemeral clone.
+    ensure_annex(root, remote=None)
 
     plan = plan_capsule(
         repository_root=root, dandiset_id=dandiset_id, dandiset_version=dandiset_version, params_key=params_key
@@ -110,14 +114,16 @@ def run_job(
         print(plan, flush=True)
         return 0
     capsule = plan.capsule
-    if not checkout_capsule(root, capsule, remote if push_to else None) and not (capsule.path / ".git").exists():
-        create_capsule(capsule)
+    if not checkout_capsule(root, capsule, remote if push_to else None):
+        create_capsule(root, capsule)
     if not force and is_up_to_date(plan):
         print(f"{capsule.name} already validated these inputs; nothing to do (use --force to validate again).")
         return 0
 
-    write_capsule(plan)
-    ensure_annex(capsule.path, remote=None)
+    sourcedata = link_sourcedata(capsule)
+    if sourcedata is None:
+        print(f"Dandiset {dandiset_id} has no DataLad mirror to link as sourcedata/.", flush=True)
+    write_capsule(plan, sourcedata=sourcedata)
     print(f"Formed {capsule.name} for {plan.number_of_assets} assets.", flush=True)
 
     # Claim the capsule before running it, so that a run that never reports back reads as stalled.
@@ -173,13 +179,13 @@ def _commit_and_publish(
     branch: str,
 ) -> None:
     """Commit the capsule's branch, then pin main's submodule for it (pushing both with ``push_to``)."""
-    save(capsule.path, paths, message)
+    commit_capsule(capsule, paths, message)
     if push_to:
         commit = publish_capsule(root, capsule, push_to)
         url = remote_url(root, push_to)
         prune_submodules(root, branches=capsule_branches(root, push_to), pipeline=capsule.pipeline)
     else:
-        commit = run(["git", "rev-parse", "HEAD"], cwd=capsule.path).stdout.strip()
+        commit = run(["git", "rev-parse", f"refs/heads/{capsule.tag}"], cwd=root).stdout.strip()
         url = remote_url(root, "origin") or f"./{capsule.name}"
     register_submodule(root, capsule, url=url, commit=commit)
     commit_main(root, [DATASET_DESCRIPTION], message)

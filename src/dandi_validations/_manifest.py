@@ -8,7 +8,6 @@ that the run records exactly which content it validated.
 """
 
 import dataclasses
-import gzip
 import hashlib
 import json
 import pathlib
@@ -19,9 +18,6 @@ from ._globals import ASSETS_JSONLD_URL_TEMPLATE, DANDISET_YAML_URL_TEMPLATE
 
 ASSETS_TSV_COLUMNS = ("path", "size", "sha256", "url", "asset_id")
 SKIPPED_TSV_COLUMNS = ("path", "asset_id", "reason")
-
-#: A table above this size is gzipped, keeping each committed file well under GitHub's limits.
-GZIP_TABLE_ABOVE_BYTES = 25 * 1024 * 1024
 
 _ZARR_ENCODING_FORMATS = {"application/x-zarr", "application/x-ngff-zarr"}
 _ZARR_SUFFIXES = (".zarr", ".ngff", ".ome.zarr")
@@ -142,12 +138,8 @@ def skipped_table_bytes(rows: list[SkippedAsset]) -> bytes:
 
 
 def write_table(content: bytes, file_path: pathlib.Path) -> pathlib.Path:
-    """Write a TSV, gzipped (with ``.gz`` appended to the name) when it is large."""
-    if len(content) > GZIP_TABLE_ABOVE_BYTES:
-        file_path = file_path.with_name(file_path.name + ".gz")
-        file_path.write_bytes(gzip.compress(content, mtime=0))
-    else:
-        file_path.write_bytes(content)
+    """Write a TSV, as plain text so that it can be read on GitHub."""
+    file_path.write_bytes(content)
     return file_path
 
 

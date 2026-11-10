@@ -30,9 +30,16 @@ https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
     │            dandiset.yaml and assets.tsv (the files that were validated)
     ├── logs/  ← all runtime records for success or failure: duct's usage and
     │            output, the image's versions, the GitHub Actions run
-    └── derivatives/  ← validation.jsonl (all results) and summary.json;
-                        present only when the validation completed
+    ├── derivatives/  ← validation.jsonl (all results) and summary.json;
+    │                   present only when the validation completed
+    ├── envs/dandi-validation/image  ← the image's registration (annexed; on GHCR)
+    └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset
+                       (https://github.com/dandisets/{{ dandiset_id }}) at its draft head when the run was formed
 ```
+
+`sourcedata/` is linked for provenance and self-containment only: the validation reads the
+Dandiset through a dataset built from the archive's S3 manifest, and nothing is fetched from the
+mirror.
 
 A capsule holds the latest validation of the Dandiset with its image. It is not run again while
 the Dandiset's files and metadata are unchanged; when they change, the next run replaces its
@@ -40,7 +47,8 @@ contents in a new commit on its branch, whose history keeps every earlier run an
 `datalad containers-run` record. To look at a capsule's results:
 
 ```bash
-git clone --recurse-submodules https://github.com/{{ organization }}/{{ dandiset_id }}
+git clone https://github.com/{{ organization }}/{{ dandiset_id }}
+git -C {{ dandiset_id }} submodule update --init  # the capsules, not their sourcedata/
 dandi validate --load {{ dandiset_id }}/{{ capsule_pattern }}/derivatives/validation.jsonl --summary
 ```
 

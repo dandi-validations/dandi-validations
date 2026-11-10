@@ -4,6 +4,7 @@ from dandi_validations._branches import (
     capsule_branches,
     checkout_capsule,
     create_capsule,
+    link_sourcedata,
     prune_submodules,
     remote_heads,
 )
@@ -40,15 +41,31 @@ def _main_clone(tmp_path, name):
     return remote, clone
 
 
+def _mirror(tmp_path):
+    """A stand-in for DANDI's DataLad mirror of the Dandiset (github.com/dandisets/000123)."""
+    mirror = tmp_path / "dandisets" / "000123.git"
+    if not mirror.exists():
+        work = tmp_path / "mirror-work"
+        _git("init", "--quiet", "-b", "draft", str(work), cwd=tmp_path)
+        (work / "dandiset.yaml").write_text("identifier: DANDI:000123\n")
+        _git("add", "dandiset.yaml", cwd=work)
+        _git("commit", "--quiet", "-m", "draft", cwd=work)
+        mirror.parent.mkdir(parents=True)
+        _git("clone", "--quiet", "--bare", str(work), str(mirror), cwd=tmp_path)
+    return mirror
+
+
 def _submit(main, assets_jsonld, dandiset_yaml):
-    """What a job does before running its capsule: fetch or start the branch, write, publish."""
+    """What a job does before running its capsule: check the branch out (or start it), write, publish."""
     plan = plan_capsule(
         repository_root=main, dandiset_id="000123", assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml
     )
+    ensure_annex(main, remote=None)
     if not checkout_capsule(main, plan.capsule, "origin"):
-        create_capsule(plan.capsule)
-    write_capsule(plan)
-    ensure_annex(plan.capsule.path, remote=None)
+        create_capsule(main, plan.capsule)
+    mirrors = main.parent / "dandisets"
+    sourcedata = link_sourcedata(plan.capsule, url_template=f"file://{mirrors}/{{dandiset_id}}.git")
+    write_capsule(plan, sourcedata=sourcedata)
     _commit_and_publish(
         main, plan.capsule, paths=[plan.capsule.path], message="Submit", push_to="origin", branch="main"
     )
@@ -57,8 +74,17 @@ def _submit(main, assets_jsonld, dandiset_yaml):
 
 def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, assets_jsonld, dandiset_yaml):
     remote, main = _main_clone(tmp_path, "runner")
+    mirror = _mirror(tmp_path)
     plan = _submit(main, assets_jsonld, dandiset_yaml)
     capsule = plan.capsule
+
+    # The capsule is a worktree of main's clone: one object store and one git-annex for both. (git-annex
+    # turns a worktree's .git file into a symbolic link, so that annexed links resolve from it.)
+    dot_git = capsule.path / ".git"
+    assert dot_git.is_file() or dot_git.is_symlink()
+    assert str(capsule.path) in _git("worktree", "list", cwd=main)
+    common = _git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=capsule.path).strip()
+    assert common == str(main / ".git")
 
     # The capsule is on the branch named exactly by the image's tag, with its contents at the root.
     heads = remote_heads(main, "origin")
@@ -67,6 +93,13 @@ def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, 
     assert "code/submit.sh" in files and "code/assets.tsv" in files and ".datalad/config" in files
     assert not any(path.startswith("pipeline-") or path == "dataset_description.json" for path in files)
     assert _git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
+
+    # sourcedata/ links the mirror's draft head, as a subdataset that was never fetched.
+    mirror_draft = _git("rev-parse", "draft", cwd=mirror).strip()
+    assert _git("ls-tree", capsule.tag, "sourcedata", cwd=remote).split()[:3] == ["160000", "commit", mirror_draft]
+    capsule_gitmodules = _git("show", f"{capsule.tag}:.gitmodules", cwd=remote)
+    assert f"url = file://{mirror}" in capsule_gitmodules and "branch = draft" in capsule_gitmodules
+    assert not any((capsule.path / "sourcedata").iterdir())
 
     # main holds the single dataset_description.json and a submodule pinned to the branch's head.
     main_files = _git("ls-tree", "--name-only", "main", cwd=remote).split()
@@ -80,6 +113,7 @@ def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, 
     description = read_dataset_description(main)
     assert list(description[PROVENANCE_KEY]) == [capsule.name]
     assert description[PROVENANCE_KEY][capsule.name]["branch"] == capsule.tag
+    assert description[PROVENANCE_KEY][capsule.name]["sourcedata"]["commit"] == mirror_draft
 
     # Another runner gets the capsule back from its branch; git can clone it as a submodule too.
     _, other = _main_clone(tmp_path, "other-runner")
@@ -101,6 +135,7 @@ def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, 
         check=True,
     )
     assert (recursive / capsule.name / "code" / "submit.sh").exists()
+    assert (recursive / capsule.name / "sourcedata" / "dandiset.yaml").exists()
 
     # The collect step reads the capsule through main's submodules.
     collect(
@@ -114,6 +149,7 @@ def test_capsule_lives_on_its_tag_branch_and_main_holds_its_submodule(tmp_path, 
 
 def test_rerun_adds_to_the_branch_and_repins_main(tmp_path, assets_jsonld, dandiset_yaml):
     remote, main = _main_clone(tmp_path, "runner")
+    _mirror(tmp_path)
     first = _submit(main, assets_jsonld, dandiset_yaml)
     first_head = remote_heads(main, "origin")[first.capsule.tag]
 
@@ -140,6 +176,7 @@ def test_rerun_adds_to_the_branch_and_repins_main(tmp_path, assets_jsonld, dandi
 
 def test_deleted_branches_lose_their_submodule(tmp_path, assets_jsonld, dandiset_yaml):
     remote, main = _main_clone(tmp_path, "runner")
+    _mirror(tmp_path)
     plan = _submit(main, assets_jsonld, dandiset_yaml)
     _git("push", "--quiet", "origin", f":refs/heads/{plan.capsule.tag}", cwd=main)
 

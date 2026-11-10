@@ -26,7 +26,8 @@ CONTAINER_NAME="{{ container_name }}"
 VERSION_CODE="{{ container_version }}"
 CONTAINER_DOCKER_URL="{{ docker_url }}"
 CONTAINER_SIF_URL="{{ sif_url }}"
-CONTAINER_IMAGE_PATH=".datalad/environments/${CONTAINER_NAME}/image"
+# The image goes under envs/, which the capsule annexes (see its .gitattributes).
+CONTAINER_IMAGE_PATH="envs/${CONTAINER_NAME}/image"
 IMAGE_CACHE="${DANDI_VALIDATIONS_IMAGE_CACHE:-${HOME}/.cache/dandi-validations/images}"
 CACHED_SIF="${IMAGE_CACHE}/${CONTAINER_NAME}_${VERSION_CODE}.sif"
 
@@ -70,6 +71,7 @@ else
     fi
     datalad containers-add "$CONTAINER_NAME" "${update_flag[@]}" \
         --url "$CACHED_SIF" \
+        --image "$CONTAINER_IMAGE_PATH" \
         --call-fmt 'apptainer exec --cleanenv {img} {cmd}'
 fi
 
@@ -126,9 +128,11 @@ fi
 
 if [ "$run_status" -ne 0 ]; then
     rm -rf "${CAPSULE}/derivatives"
-    # On failure, datalad leaves the run record it would have committed in .git/COMMIT_EDITMSG.
-    if [ -f .git/COMMIT_EDITMSG ] && [ .git/COMMIT_EDITMSG -nt "$run_started" ]; then
-        cp .git/COMMIT_EDITMSG "${CAPSULE}/logs/failed_run_record.txt"
+    # On failure, datalad leaves the run record it would have committed in COMMIT_EDITMSG (in the
+    # git directory, which for a worktree is not .git/).
+    commit_message="$(git rev-parse --git-dir)/COMMIT_EDITMSG"
+    if [ -f "$commit_message" ] && [ "$commit_message" -nt "$run_started" ]; then
+        cp "$commit_message" "${CAPSULE}/logs/failed_run_record.txt"
     fi
 fi
 rm -f "$run_started"

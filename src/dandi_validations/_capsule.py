@@ -325,11 +325,12 @@ def is_up_to_date(plan: CapsulePlan) -> bool:
     )
 
 
-def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None) -> None:
+def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None, sourcedata: dict | None = None) -> None:
     """
     Replace the capsule's code (and results) with the next run's, and record its provenance.
 
     Only what a run writes is replaced: the capsule's dataset, image registration and history stay.
+    ``sourcedata`` is the link to DANDI's DataLad mirror of the Dandiset (see ``_branches``).
     """
     now = now if now is not None else datetime.datetime.now(tz=datetime.timezone.utc)
     capsule, pipeline = plan.capsule, plan.pipeline
@@ -362,6 +363,8 @@ def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None) ->
         "image": pipeline.image_reference,
         "image_digest": image_digest,
         "branch": capsule.tag,
+        # DANDI's DataLad mirror of the Dandiset at this run, linked as sourcedata/ (not validated).
+        "sourcedata": sourcedata,
         "pipeline": pipeline.pipeline,
         "params_key": plan.parameters.key,
         "assets": plan.number_of_assets,
