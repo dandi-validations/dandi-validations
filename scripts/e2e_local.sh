@@ -1,10 +1,11 @@
 #!/bin/bash
 # End-to-end test of one validation job, without GitHub or GHCR.
 #
-# Builds the dandi-validate image locally with Docker, converts it to a SIF with Apptainer, creates
-# a Dandiset repository from the template in a local bare "remote", and runs the job exactly as
-# the Validate workflow does (`dandi-validations run ... --push origin`). Then it checks that the
-# capsule succeeded, that every asset was streamed, and that a second run skips.
+# Builds the dandi-validation image locally with Docker (tagged by its version code), converts it
+# to a SIF with Apptainer, creates a Dandiset repository from the template in a local bare
+# "remote", and runs the job exactly as the Validate workflow does
+# (`dandi-validations run ... --push origin`). Then it checks that the capsule succeeded, that
+# every asset was streamed, that the provenance names the image, and that a second run skips.
 #
 # Needs: docker, apptainer, and this package installed (`pip install .`), which brings datalad,
 # datalad-container, git-annex and con-duct.
@@ -16,32 +17,35 @@ set -euo pipefail
 DANDISET_ID="${1:-000006}"
 WORK_DIRECTORY="$(realpath -m "${2:-$(mktemp -d -t dandi-validations-e2e-XXXXXX)}")"
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONTAINER_DIRECTORY="${REPOSITORY_ROOT}/containers/dandi-validation"
 PINS="${REPOSITORY_ROOT}/src/dandi_validations/pipeline.json"
 
 read_pin() {
     python -c 'import functools, json, sys; print(functools.reduce(dict.get, sys.argv[2].split("."), json.load(open(sys.argv[1]))))' "$PINS" "$1"
 }
 IMAGE="$(read_pin container.image)"
-VERSION="$(read_pin container.version)"
+CODE="$(read_pin container.version)"
 NAME="$(read_pin container.name)"
-DANDI_CLI_REPOSITORY="$(read_pin dandi_cli.repository)"
-DANDI_CLI_COMMIT="$(read_pin dandi_cli.commit)"
+
+LOCKED_CODE="$(dandi-validations version-code --pixi-lock "${CONTAINER_DIRECTORY}/pixi.lock")"
+if [ "$LOCKED_CODE" != "$CODE" ]; then
+    echo "pixi.lock makes version code ${LOCKED_CODE}, but pipeline.json pins ${CODE}." >&2
+    exit 1
+fi
 
 mkdir -p "$WORK_DIRECTORY"
-echo "Working in ${WORK_DIRECTORY}"
+echo "Working in ${WORK_DIRECTORY} on ${IMAGE}:${CODE}"
 
 export DANDI_VALIDATIONS_IMAGE_CACHE="${WORK_DIRECTORY}/images"
 mkdir -p "$DANDI_VALIDATIONS_IMAGE_CACHE"
-SIF="${DANDI_VALIDATIONS_IMAGE_CACHE}/${NAME}_${VERSION}.sif"
+SIF="${DANDI_VALIDATIONS_IMAGE_CACHE}/${NAME}_${CODE}.sif"
 if [ ! -s "$SIF" ]; then
-    docker build \
-        --build-arg DANDI_CLI_REPOSITORY="$DANDI_CLI_REPOSITORY" \
-        --build-arg DANDI_CLI_COMMIT="$DANDI_CLI_COMMIT" \
-        --build-arg CONTAINER_VERSION="$VERSION" \
-        -t "${IMAGE}:${VERSION}" \
-        "${REPOSITORY_ROOT}/containers/dandi-validate"
-    apptainer build --force "$SIF" "docker-daemon://${IMAGE}:${VERSION}"
+    docker build --tag "${IMAGE}:${CODE}" "$CONTAINER_DIRECTORY"
+    apptainer build --force "$SIF" "docker-daemon://${IMAGE}:${CODE}"
 fi
+# The image is not in a registry, so record its local ID as its digest.
+DANDI_VALIDATIONS_IMAGE_DIGEST="$(docker image inspect --format '{{.Id}}' "${IMAGE}:${CODE}" 2> /dev/null || echo "sha256:local")"
+export DANDI_VALIDATIONS_IMAGE_DIGEST
 
 REMOTE="${WORK_DIRECTORY}/remotes/${DANDISET_ID}.git"
 CLONE="${WORK_DIRECTORY}/runner/${DANDISET_ID}"
@@ -60,14 +64,17 @@ git clone --quiet "$REMOTE" "$CLONE"
 cd "$CLONE"
 dandi-validations run --dandiset-id "$DANDISET_ID" --push origin --time-limit-minutes 60
 
-PIPELINE_DIRECTORY="derivatives/dandisets-${DANDISET_ID:0:3}/dandiset-${DANDISET_ID}/pipeline-dandi+validate"
-python - "$PIPELINE_DIRECTORY" <<'EOF'
+python - "pipeline-dandi+validate" "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" <<'EOF'
 import csv, json, pathlib, sys
 
-pipeline_directory = pathlib.Path(sys.argv[1])
+pipeline_directory, image, code, digest = pathlib.Path(sys.argv[1]), *sys.argv[2:]
+assert json.loads(pathlib.Path("dataset_description.json").read_text())["DatasetType"] == "derivative"
 rows = list(csv.DictReader((pipeline_directory / "jobs.tsv").open(), delimiter="\t"))
 assert len(rows) == 1 and rows[0]["status"] == "successful", rows
+assert rows[0]["version"] == code, rows
 capsule = pipeline_directory / rows[0]["job_id"]
+provenance = json.loads((capsule / "dataset_description.json").read_text())["DandiValidations"]
+assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] == digest, provenance
 summary = json.loads((capsule / "derivatives" / "summary.json").read_text())
 assets = int(rows[0]["assets"])
 assert summary["files_streamed"] == assets, (summary["files_streamed"], assets)

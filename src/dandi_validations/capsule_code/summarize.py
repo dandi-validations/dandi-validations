@@ -1,7 +1,7 @@
 """
 Summarize the JSON Lines results of `dandi validate` into derivatives/summary.json.
 
-Runs inside the dandi-validate container (called by run.sh) and uses only the standard library,
+Runs inside the dandi-validation image (called by run.sh) and uses only the standard library,
 so that it reads the records exactly as dandi-cli wrote them.
 """
 

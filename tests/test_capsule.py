@@ -4,6 +4,8 @@ import json
 from dandi_validations._capsule import capsule_status, list_capsule_names, prepare_capsule
 from dandi_validations._globals import PROVENANCE_KEY
 from dandi_validations._pipeline import load_parameters, load_pipeline
+from dandi_validations._registry import DIGEST_OVERRIDE_VARIABLE
+from dandi_validations._version_code import parse_version_code
 
 NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.timezone.utc)
 
@@ -19,15 +21,18 @@ def _prepare(root, assets_jsonld, dandiset_yaml, **kwargs):
     )
 
 
+DIGEST = "sha256:" + "f" * 64
+
+
 def test_prepare_capsule_layout_and_provenance(git_repository, assets_jsonld, dandiset_yaml, monkeypatch):
     monkeypatch.setenv("GITHUB_RUN_ID", "42")
     monkeypatch.setenv("GITHUB_REPOSITORY", "dandi-validations/000123")
+    monkeypatch.setenv(DIGEST_OVERRIDE_VARIABLE, DIGEST)
     result = _prepare(git_repository, assets_jsonld, dandiset_yaml)
     capsule = result.capsule
     assert capsule is not None
-    assert capsule.relative_path.as_posix().startswith(
-        "derivatives/dandisets-000/dandiset-000123/pipeline-dandi+validate/job-261105"
-    )
+    # The repository is a standalone derivative dataset: the pipeline sits at its root.
+    assert capsule.relative_path.as_posix().startswith("pipeline-dandi+validate/job-261105")
 
     code = sorted(path.name for path in capsule.code_directory.iterdir())
     assert code == [
@@ -47,7 +52,8 @@ def test_prepare_capsule_layout_and_provenance(git_repository, assets_jsonld, da
     submit = capsule.submit_script_path.read_text()
     pipeline = load_pipeline()
     assert f'CAPSULE="{capsule.relative_path.as_posix()}"' in submit
-    assert pipeline.docker_url in submit and pipeline.sif_url in submit
+    assert f"docker://{pipeline.container_image}@{DIGEST}" in submit and pipeline.sif_url in submit
+    assert f'VERSION_CODE="{pipeline.container_version}"' in submit
     assert "datalad containers-run" in submit and "duct --output-prefix" in submit
     assert "apptainer exec --cleanenv {img} {cmd}" in submit
 
@@ -56,8 +62,19 @@ def test_prepare_capsule_layout_and_provenance(git_repository, assets_jsonld, da
     assert provenance["job_id"] == capsule.job_id
     assert provenance["assets"] == 2 and provenance["skipped_assets"] == 2
     assert provenance["params"] == load_parameters("default").identifier
+    assert provenance["version"] == pipeline.container_version
+    assert provenance["validator_versions"] == parse_version_code(pipeline.container_version)
+    assert provenance["image"] == f"ghcr.io/dandi-validations/dandi-validation:{pipeline.container_version}"
+    assert provenance["image_digest"] == DIGEST
     assert description["DatasetType"] == "derivative"
     assert description["GeneratedBy"][0]["CodeURL"].endswith(pipeline.dandi_cli_commit)
+    container = description["GeneratedBy"][1]
+    assert container["CodeURL"] == f"{provenance['image']}@{DIGEST}"
+    assert container["Container"] == {
+        "Type": "docker",
+        "Tag": pipeline.container_version,
+        "URI": f"docker://{pipeline.container_image}@{DIGEST}",
+    }
 
     assert capsule_status(capsule.path) == "stalled"
 

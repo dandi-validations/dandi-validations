@@ -74,6 +74,17 @@ def main(argv: list[str] | None = None) -> int:
     list_parser = commands.add_parser("list-dandisets", help="List the Dandisets to validate.")
     _add_selection_arguments(list_parser, source=True)
 
+    code_parser = commands.add_parser(
+        "version-code", help="Print the validator version code (dandi/dandi-archive#2987) of a lock or an image."
+    )
+    code_source = code_parser.add_mutually_exclusive_group(required=True)
+    code_source.add_argument("--pixi-lock", type=pathlib.Path, help="A pixi.lock to read the versions from.")
+    code_source.add_argument(
+        "--versions-json",
+        type=pathlib.Path,
+        help="The output of the image's dandi-validation-versions ('-' for stdin).",
+    )
+
     ensure_parser = commands.add_parser(
         "ensure-repos", help="Create missing Dandiset repositories and sync the template into them."
     )
@@ -130,6 +141,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if arguments.command == "list-dandisets":
         print("\n".join(_dandiset_ids(arguments)))
+        return 0
+
+    if arguments.command == "version-code":
+        import json
+
+        from ._version_code import VersionCodeError, build_version_code, versions_from_pixi_lock
+
+        if arguments.pixi_lock is not None:
+            versions = versions_from_pixi_lock(arguments.pixi_lock.read_text())
+        else:
+            text = sys.stdin.read() if str(arguments.versions_json) == "-" else arguments.versions_json.read_text()
+            versions = json.loads(text)["validator_versions"]
+        try:
+            print(build_version_code(versions))
+        except VersionCodeError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
         return 0
 
     if arguments.command == "ensure-repos":

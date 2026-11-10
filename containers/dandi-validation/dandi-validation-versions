@@ -1,26 +1,15 @@
-#!/opt/venv/bin/python
-"""Print, as JSON, the versions of the software in the dandi-validate container."""
+#!/usr/bin/env python
+"""Print, as JSON, the versions of the software in the dandi-validation image."""
 
 import importlib.metadata
 import json
-import os
 import platform
 import subprocess
 
-KEY_DISTRIBUTIONS = (
-    "dandi",
-    "dandischema",
-    "datalad",
-    "datalad-fuse",
-    "remfile",
-    "con-duct",
-    "git-annex",
-    "pynwb",
-    "hdmf",
-    "h5py",
-    "nwbinspector",
-    "bidsschematools",
-)
+#: The packages whose versions make up the image's version code (dandi/dandi-archive#2987).
+VALIDATORS = ("dandi", "dandischema", "nwbinspector", "pynwb", "hdmf", "bids-validator-deno")
+#: Other packages a job's results depend on.
+TOOLS = ("datalad", "datalad-container", "datalad-fuse", "remfile", "con-duct", "bidsschematools")
 
 
 def _command_version(command: list[str]) -> str | None:
@@ -39,15 +28,11 @@ def _distribution_version(name: str) -> str | None:
 
 
 versions = {
-    "container_version": os.environ.get("DANDI_VALIDATE_CONTAINER_VERSION"),
-    "dandi_cli": {
-        "repository": os.environ.get("DANDI_VALIDATE_DANDI_CLI_REPOSITORY"),
-        "commit": os.environ.get("DANDI_VALIDATE_DANDI_CLI_COMMIT"),
-    },
+    "validator_versions": {name: _distribution_version(name) for name in VALIDATORS},
+    "tool_versions": {name: _distribution_version(name) for name in TOOLS},
     "python": platform.python_version(),
     "git": _command_version(["git", "--version"]),
     "git_annex": _command_version(["git", "annex", "version", "--raw"]),
-    "key_distributions": {name: _distribution_version(name) for name in KEY_DISTRIBUTIONS},
     "all_distributions": dict(
         sorted(
             (distribution.metadata["Name"], distribution.version) for distribution in importlib.metadata.distributions()

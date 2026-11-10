@@ -26,7 +26,7 @@ def test_sync_initializes_then_is_idempotent_then_updates(tmp_path):
     assert sync_repository(dandiset_id="000123", remote_url=url, codebase_ref="main", work_directory=work)
     dataset_id = _show(remote, ".datalad/config")
     assert "id = " in dataset_id
-    assert json.loads(_show(remote, "dataset_description.json"))["DatasetType"] == "study"
+    assert json.loads(_show(remote, "dataset_description.json"))["DatasetType"] == "derivative"
     assert "annex.largefiles=nothing" in _show(remote, ".gitattributes")
 
     assert not sync_repository(dandiset_id="000123", remote_url=url, codebase_ref="main", work_directory=work)

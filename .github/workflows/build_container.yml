@@ -1,32 +1,28 @@
 name: Build and publish container
 
-# Mints the dandi-validate container on this organization's GitHub Container Registry:
+# Mints dandi-validation images following the convention of dandi/dandi-archive#2987:
 #
-#   ghcr.io/dandi-validations/dandi-validate:<version>      OCI image (Docker)
-#   ghcr.io/dandi-validations/dandi-validate:latest
-#   ghcr.io/dandi-validations/dandi-validate:sif-<version>  the same image as an Apptainer SIF (ORAS)
+#   ghcr.io/dandi-validations/dandi-validation:<version code>      the OCI image
+#   ghcr.io/dandi-validations/dandi-validation:latest              the newest one
+#   ghcr.io/dandi-validations/dandi-validation:sif-<version code>  the same image as an Apptainer SIF (ORAS)
 #
-# The version and the dandi-cli commit come from src/dandi_validations/pipeline.json, which is
-# also what every Dandiset repository's validation job reads to decide which image to run. Bump
-# `container.version` there whenever the image changes: jobs are keyed on it.
+# with the pixi.lock it was built from attached to the OCI image (ORAS), and carried inside it.
 #
-# The SIF is published so that every job pulls byte-identical image content. Its annex key is
-# then the same in every repository's `datalad containers-run` records, and jobs skip the
-# Docker-to-SIF conversion.
+# The version code is derived from the six validator versions in containers/dandi-validation/pixi.lock
+# (local `+...` segments dropped), and must equal `container.version` in
+# src/dandi_validations/pipeline.json, which is what every Dandiset repository's jobs run.
+# An image is never rebuilt, so one code always names one image: a code that is already published
+# is left alone if it was built from the same lock, and is an error otherwise.
 
 on:
   workflow_dispatch:
-    inputs:
-      overwrite:
-        description: "Rebuild and overwrite tags that already exist for this version"
-        type: boolean
-        default: false
   push:
     branches:
       - main
     paths:
-      - "containers/dandi-validate/**"
+      - "containers/dandi-validation/**"
       - "src/dandi_validations/pipeline.json"
+      - "src/dandi_validations/_version_code.py"
       - ".github/workflows/build_container.yml"
 
 permissions:
@@ -34,7 +30,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
@@ -44,90 +40,132 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Read pins from pipeline.json
-        id: pins
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: python -m pip install .
+
+      - name: Version code
+        id: code
         run: |
           set -euo pipefail
-          pins=src/dandi_validations/pipeline.json
-          image=$(jq -r '.container.image' "$pins" | tr '[:upper:]' '[:lower:]')
-          version=$(jq -r '.container.version' "$pins")
-          {
-            echo "image=${image}"
-            echo "version=${version}"
-            echo "dandi_cli_repository=$(jq -r '.dandi_cli.repository' "$pins")"
-            echo "dandi_cli_commit=$(jq -r '.dandi_cli.commit' "$pins")"
-          } >> "$GITHUB_OUTPUT"
+          code="$(dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock)"
+          pinned="$(jq -r '.container.version' src/dandi_validations/pipeline.json)"
+          image="$(jq -r '.container.image' src/dandi_validations/pipeline.json | tr '[:upper:]' '[:lower:]')"
+          if [ "$code" != "$pinned" ]; then
+            echo "::error::pixi.lock makes version code ${code}, but pipeline.json pins ${pinned}."
+            exit 1
+          fi
+          echo "code=${code}" >> "$GITHUB_OUTPUT"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to the GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
-      - name: Skip versions that are already published
+      - name: Never rebuild a published code
         id: existing
         env:
-          REFERENCE: ${{ steps.pins.outputs.image }}:${{ steps.pins.outputs.version }}
+          REFERENCE: ${{ steps.code.outputs.image }}:${{ steps.code.outputs.code }}
         run: |
-          if docker manifest inspect "$REFERENCE" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::${REFERENCE} exists; bump container.version in pipeline.json to publish a new image."
-          else
+          set -euo pipefail
+          if ! docker buildx imagetools inspect "$REFERENCE" > /dev/null 2>&1; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          docker run --rm "$REFERENCE" cat /opt/dandi-validation/pixi.lock > published.lock
+          if ! cmp -s published.lock containers/dandi-validation/pixi.lock; then
+            echo "::error::${REFERENCE} is already published from a different pixi.lock, and images are never rebuilt."
+            exit 1
+          fi
+          echo "::notice::${REFERENCE} is already published from this pixi.lock; nothing to do."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.existing.outputs.exists == 'false'
+        run: docker build --tag "${{ steps.code.outputs.image }}:${{ steps.code.outputs.code }}" containers/dandi-validation
+
+      - name: Check the image's own version code
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          REFERENCE: ${{ steps.code.outputs.image }}:${{ steps.code.outputs.code }}
+        run: |
+          set -euo pipefail
+          docker run --rm "$REFERENCE" dandi-validation-versions > versions.json
+          built="$(dandi-validations version-code --versions-json versions.json)"
+          if [ "$built" != "${{ steps.code.outputs.code }}" ]; then
+            echo "::error::The built image's validators make up version code ${built}, not ${{ steps.code.outputs.code }}."
+            exit 1
           fi
 
-      - name: Set up Docker Buildx
-        if: steps.existing.outputs.exists == 'false' || inputs.overwrite
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build and push the OCI image
-        if: steps.existing.outputs.exists == 'false' || inputs.overwrite
-        id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: containers/dandi-validate
-          file: containers/dandi-validate/Dockerfile
-          push: true
-          build-args: |
-            DANDI_CLI_REPOSITORY=${{ steps.pins.outputs.dandi_cli_repository }}
-            DANDI_CLI_COMMIT=${{ steps.pins.outputs.dandi_cli_commit }}
-            CONTAINER_VERSION=${{ steps.pins.outputs.version }}
-          tags: |
-            ${{ steps.pins.outputs.image }}:${{ steps.pins.outputs.version }}
-            ${{ steps.pins.outputs.image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Push the OCI image
+        if: steps.existing.outputs.exists == 'false'
+        id: push
+        env:
+          IMAGE: ${{ steps.code.outputs.image }}
+          CODE: ${{ steps.code.outputs.code }}
+        run: |
+          set -euo pipefail
+          docker push "${IMAGE}:${CODE}"
+          docker tag "${IMAGE}:${CODE}" "${IMAGE}:latest"
+          docker push "${IMAGE}:latest"
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${CODE}" | awk '/^Digest:/ {print $2; exit}')"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Apptainer
-        if: steps.existing.outputs.exists == 'false' || inputs.overwrite
+        if: steps.existing.outputs.exists == 'false'
         uses: ./.github/actions/setup-apptainer
 
-      - name: Convert to SIF and push it with ORAS
-        if: steps.existing.outputs.exists == 'false' || inputs.overwrite
+      - name: Push the SIF
+        if: steps.existing.outputs.exists == 'false'
         env:
-          APPTAINER_DOCKER_USERNAME: ${{ github.actor }}
-          APPTAINER_DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ steps.code.outputs.image }}
+          CODE: ${{ steps.code.outputs.code }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image="${{ steps.pins.outputs.image }}"
-          version="${{ steps.pins.outputs.version }}"
-          apptainer build dandi-validate.sif "docker://${image}@${{ steps.build.outputs.digest }}"
-          apptainer exec --cleanenv dandi-validate.sif dandi-validate-versions > versions.json
+          apptainer build dandi-validation.sif "docker-daemon://${IMAGE}:${CODE}"
           echo "$REGISTRY_PASSWORD" | apptainer registry login --username "${{ github.actor }}" --password-stdin oras://ghcr.io
-          apptainer push dandi-validate.sif "oras://${image}:sif-${version}"
+          apptainer push dandi-validation.sif "oras://${IMAGE}:sif-${CODE}"
+          sha256sum dandi-validation.sif | cut -d' ' -f1 > sif.sha256
+
+      - name: Set up ORAS
+        if: steps.existing.outputs.exists == 'false'
+        uses: oras-project/setup-oras@v1
+
+      - name: Attach the lock to the image
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          IMAGE: ${{ steps.code.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$REGISTRY_PASSWORD" | oras login ghcr.io --username "${{ github.actor }}" --password-stdin
+          cp containers/dandi-validation/pixi.lock pixi.lock
+          oras attach --artifact-type application/vnd.dandi-validations.pixi-lock "${IMAGE}@${DIGEST}" pixi.lock:application/yaml
+
+      - name: Summary
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          IMAGE: ${{ steps.code.outputs.image }}
+          CODE: ${{ steps.code.outputs.code }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
           {
-            echo "## dandi-validate ${version}"
+            echo "## dandi-validation ${CODE}"
             echo
             echo "| Artifact | Reference |"
             echo "| --- | --- |"
-            echo "| OCI image | \`docker://${image}:${version}\` |"
-            echo "| OCI digest | \`${{ steps.build.outputs.digest }}\` |"
-            echo "| SIF | \`oras://${image}:sif-${version}\` |"
-            echo "| SIF sha256 | \`$(sha256sum dandi-validate.sif | cut -d' ' -f1)\` |"
+            echo "| OCI image | \`${IMAGE}:${CODE}\` |"
+            echo "| OCI digest | \`${DIGEST}\` |"
+            echo "| SIF | \`oras://${IMAGE}:sif-${CODE}\` |"
+            echo "| SIF sha256 | \`$(cat sif.sha256)\` |"
+            echo "| Lock | attached to \`${IMAGE}@${DIGEST}\` (\`oras discover\`) |"
             echo
             echo '```json'
-            jq '{container_version, dandi_cli, python, git_annex, key_distributions}' versions.json
+            jq '{validator_versions, tool_versions, python, git, git_annex}' versions.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

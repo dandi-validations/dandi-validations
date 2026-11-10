@@ -9,6 +9,11 @@ Nothing is downloaded: the content-dependent validators (pynwb, nwbinspector) re
 need, straight from S3. Each run is recorded as a self-contained **job capsule**, laid out like
 [DANDI Compute's](https://github.com/dandi-compute/001697).
 
+The validation runs in a `dandi-validation` image that this repository mints on GHCR, tagged by
+its **validator version code** following the convention of
+[dandi/dandi-archive#2987](https://github.com/dandi/dandi-archive/pull/2987), e.g.
+`ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2`.
+
 This repository holds the container recipe, the orchestration code, the template of the Dandiset
 repositories, and the records collected from them (`records/`).
 
@@ -19,17 +24,20 @@ On the runner of `dandi-validations/{dandiset_id}` (its **Validate** workflow), 
 1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket
    (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`) and writes the capsule's `code/`:
    the assets to validate (`assets.tsv`: path, size, SHA-256, S3 URL), `dandiset.yaml`, the
-   parameters, `run.sh`, and `submit.sh`. The job ID covers the container version, the parameters
-   and the digest of those inputs, so an unchanged Dandiset is not validated twice; a failed job is
-   retried in a new capsule. The capsule is committed and pushed before it runs (claimed), so a run
-   that never reports back reads as *stalled*.
-2. **Runs `code/submit.sh`.** It pulls the `dandi-validate` SIF from GHCR, registers it with
-   `datalad containers-add` (`apptainer exec --cleanenv {img} {cmd}`), and executes `code/run.sh`
+   parameters, `run.sh`, and `submit.sh`. It resolves the image's digest on GHCR and records the
+   image's reference, digest and six validator versions in the capsule's `dataset_description.json`.
+   The job ID covers the image's version code, the parameters and the digest of those inputs, so an
+   unchanged Dandiset is not validated twice by the same image; a failed job is retried in a new
+   capsule. The capsule is committed and pushed before it runs (claimed), so a run that never
+   reports back reads as *stalled*.
+2. **Runs `code/submit.sh`.** It pulls the `dandi-validation` SIF from GHCR, registers it with
+   `datalad containers-add` (`apptainer exec --cleanenv {img} {cmd}`), refuses to go on unless the
+   image's installed validators make up the expected version code, and executes `code/run.sh`
    inside it with `datalad containers-run`, wrapped in [duct](https://github.com/con/duct):
 
    ```bash
    duct --output-prefix "$CAPSULE/logs/duct_" --fail-time 0 \
-       datalad containers-run --container-name dandi-validate --explicit \
+       datalad containers-run --container-name dandi-validation --explicit \
            --input "$CAPSULE/code/..." --output "$CAPSULE/derivatives" \
            "bash '$CAPSULE/code/run.sh' ..."
    ```
@@ -41,7 +49,7 @@ On the runner of `dandi-validations/{dandiset_id}` (its **Validate** workflow), 
    `dandi validate --missing-file-content=stream -J 8 --format json_lines`. Its results and a
    summary go to the capsule's `derivatives/`, and the `[DATALAD RUNCMD]` commit records the
    command, inputs and outputs, so `datalad rerun` reproduces the job.
-3. **Records it.** duct's records, the container's versions, the GitHub Actions run and the output
+3. **Records it.** duct's records, the image's versions, the GitHub Actions run and the output
    of `submit.sh` go to `logs/`; the pipeline's `jobs.tsv` is rebuilt; both are committed and pushed.
 
 `dandi validate` exits 1 whenever it reports an error, which is still a completed validation: it
@@ -51,27 +59,28 @@ capsule *failed*.
 
 ## Job capsules
 
+Each Dandiset repository is a standalone
+([type 2](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets))
+BIDS derivative dataset of its Dandiset:
+
 ```
 dandi-validations/{dandiset_id}/
-├── dataset_description.json  ← a BIDS study
-└── derivatives/
-    └── dandisets-{first 3 digits of the Dandiset ID}/
-        └── dandiset-{dandiset_id}/
-            └── pipeline-dandi+validate/
-                ├── jobs.tsv, jobs.json  ← one row per capsule, rebuilt after each job
-                └── job-{YYMMDD}{hash}/
-                    ├── code/  ← assets.tsv, dandiset.yaml, name-default.json, run.sh,
-                    │            summarize.py, submit.sh, submitted_date-... (claim marker)
-                    ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
-                    │            container_versions.json, run.json, submit.log
-                    ├── derivatives/  ← validation.jsonl (or .jsonl.gz), summary.json
-                    └── dataset_description.json  ← provenance (GeneratedBy, DandiValidations)
+├── dataset_description.json  ← the derivative dataset (DatasetType "derivative")
+└── pipeline-dandi+validate/
+    ├── jobs.tsv, jobs.json  ← one row per capsule, rebuilt after each job
+    └── job-{YYMMDD}{hash}/
+        ├── code/  ← assets.tsv, dandiset.yaml, name-default.json, run.sh,
+        │            summarize.py, submit.sh, submitted_date-... (claim marker)
+        ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
+        │            container_versions.json, run.json, submit.log
+        ├── derivatives/  ← validation.jsonl (or .jsonl.gz), summary.json
+        └── dataset_description.json  ← provenance (GeneratedBy with the image's Container,
+                                         DandiValidations)
 ```
 
-Validation is per Dandiset, so capsules sit directly under the Dandiset rather than under the
-`sub-`/`ses-` levels of DANDI Compute's per-asset pipelines; the rest of the nesting is kept so
-that the capsules of every repository can be collected into one tree without colliding. Job IDs
-follow DANDI Compute's `job-{YYMMDD}{md5[:6]}` scheme, with `-2`, `-3` for re-runs on one day.
+Validation is per Dandiset, so capsules sit directly under the pipeline rather than under the
+`sub-`/`ses-` levels of DANDI Compute's per-asset pipelines. Job IDs follow DANDI Compute's
+`job-{YYMMDD}{md5[:6]}` scheme, with `-2`, `-3` for re-runs on one day.
 
 Lifecycle status, read from what a capsule holds: *pending* (code only), *stalled* (claimed, nothing
 logged), *failed* (logs, no results), *successful* (results under `derivatives/`).
@@ -80,27 +89,51 @@ Each Dandiset repository is a DataLad dataset. Capsule files are kept in git (re
 only the container image is annexed, and its content lives on GHCR. Runners initialize git-annex
 with `annex.private`, so ephemeral clones never appear in the git-annex branch.
 
-## The container
+## The image
 
-`containers/dandi-validate/Dockerfile` installs what the PR's recipe installs (`git-annex`,
-`con-duct`, `dandi[datalad]` from dandi/dandi-cli#1956, pinned to a commit) plus DataLad.
-`src/dandi_validations/pipeline.json` pins the dandi-cli commit and the container version, and is
-the single source of truth for both the build and the jobs. The **Build and publish container**
-workflow (on changes to either) mints:
+`containers/dandi-validation/` follows the image design of dandi/dandi-archive#2987:
+
+- **Environment:** `pixi.toml` lists what the recipe at the top of dandi/dandi-cli#1956 installs
+  (git-annex, con-duct, `dandi[datalad]`), plus DataLad and datalad-container. `pixi.lock` pins
+  all of it with checksums, including Python, git and git-annex from conda-forge. dandi-cli and
+  datalad-fuse are pinned to commits until their streaming support is released.
+- **Build:** a two-stage `Dockerfile`. The official pixi image runs `pixi install --locked`, and
+  a plain `ubuntu:24.04` receives only the environment, its lock and an activation script. Both
+  base images are pinned by digest.
+- **Version code:** the tag lists the six validator versions, each behind its one-letter code:
+  `d<dandi>-s<dandischema>-n<nwbinspector>-p<pynwb>-h<hdmf>-b<bids-validator-deno>`. Each must
+  be a plain `MAJOR.MINOR.PATCH` release, except that a local segment is dropped. For example,
+  dandi `0.82.0+28.gbec91fa4`, installed from the #1956 commit, appears as `d0.82.0`. Its full
+  version stays in the image's `/opt/dandi-validation/versions.json` and in each job's
+  `logs/container_versions.json`. `dandi-validations version-code --pixi-lock` computes the code.
+
+The **Build and publish container** workflow mints, for the code that `pixi.lock` makes up:
 
 | Reference | What |
 | --- | --- |
-| `ghcr.io/dandi-validations/dandi-validate:<version>` (and `:latest`) | OCI image |
-| `oras://ghcr.io/dandi-validations/dandi-validate:sif-<version>` | the same image as an Apptainer SIF |
+| `ghcr.io/dandi-validations/dandi-validation:<version code>` (and `:latest`) | the OCI image, with `pixi.lock` attached (ORAS) |
+| `oras://ghcr.io/dandi-validations/dandi-validation:sif-<version code>` | the same image as an Apptainer SIF |
 
-Jobs pull the SIF, so every repository records the same image key; if it is unavailable they
-convert the OCI image instead. Bump `container.version` whenever the image changes: jobs are keyed on it.
+**Immutable images:** an image is never rebuilt, so one code always names one image.
+- A code that is already published is skipped if it was built from the same lock, and is an error otherwise.
+- The workflow also refuses to publish an image whose installed validators don't make up the code.
+
+`src/dandi_validations/pipeline.json` names the image and version code that jobs run, and a test
+checks that it matches `pixi.lock`.
+
+Jobs pull the SIF, so every repository records the same image key. If the SIF is unavailable,
+they convert the OCI image, pinned by digest.
+
+To update the image:
+1. Change `pixi.toml` and run `pixi lock` in `containers/dandi-validation/`.
+2. Set `container.version` to the new code printed by
+   `dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock`.
 
 ## Workflows of this repository
 
 | Workflow | What it does |
 | --- | --- |
-| **Build and publish container** | Builds the image and pushes the OCI image and SIF to GHCR. |
+| **Build and publish container** | Builds the image for the version code of `pixi.lock` and pushes the OCI image, its SIF and its lock to GHCR, unless that code is already published. |
 | **Make repositories** | Creates `dandi-validations/{id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into all of them; optionally dispatches their validation. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
 | **Collect records** | Every 6 hours, gathers each repository's `jobs.tsv` into `records/jobs.tsv` and `records/latest.tsv`. |
@@ -112,7 +145,7 @@ convert the OCI image instead. Bump `container.version` whenever the image chang
    repositories in `dandi-validations`, push workflow files to them, and dispatch their workflows
    (classic PAT with `repo`, `workflow` and `admin:org`, or a fine-grained token with
    Administration, Contents, Workflows and Actions write access).
-2. Run **Build and publish container**, then make the `dandi-validate` package public (Package
+2. Run **Build and publish container**, then make the `dandi-validation` package public (Package
    settings → Change visibility), so that every repository's runner can pull it anonymously.
 3. Run **Make repositories** (try `dandiset_ids: 000006` first), then **Dispatch validations**.
 
@@ -121,6 +154,7 @@ convert the OCI image instead. Bump `container.version` whenever the image chang
 ```bash
 pip install .
 dandi-validations list-dandisets --source s3 --limit 5
+dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock
 dandi-validations prepare --dandiset-id 000006 --path /path/to/dataset   # form a capsule only
 dandi-validations run --dandiset-id 000006 --push origin                 # what the Validate workflow runs
 dandi-validations ensure-repos --dandiset-ids 000006 --codebase-ref main

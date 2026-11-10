@@ -2,7 +2,8 @@
 # DANDI Validations job capsule {{ job_id }}
 #
 #   What:      dandi validate, streaming (dandi/dandi-cli#1956), of Dandiset {{ dandiset_id }} ({{ dandiset_version }})
-#   Container: {{ docker_url }}
+#   Image:     {{ image_reference }}
+#              digest {{ image_digest }}
 #              ({{ sif_url }} as an Apptainer SIF)
 #   Where:     a GitHub Actions runner of https://github.com/{{ organization }}/{{ dandiset_id }}
 #
@@ -20,11 +21,12 @@ set -euo pipefail
 CAPSULE="{{ capsule_path }}"
 DANDISET_ID="{{ dandiset_id }}"
 CONTAINER_NAME="{{ container_name }}"
+VERSION_CODE="{{ container_version }}"
 CONTAINER_DOCKER_URL="{{ docker_url }}"
 CONTAINER_SIF_URL="{{ sif_url }}"
 CONTAINER_IMAGE_PATH=".datalad/environments/${CONTAINER_NAME}/image"
 IMAGE_CACHE="${DANDI_VALIDATIONS_IMAGE_CACHE:-${HOME}/.cache/dandi-validations/images}"
-CACHED_SIF="${IMAGE_CACHE}/${CONTAINER_NAME}_{{ container_version }}.sif"
+CACHED_SIF="${IMAGE_CACHE}/${CONTAINER_NAME}_${VERSION_CODE}.sif"
 
 cd "$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 
@@ -70,7 +72,14 @@ else
 fi
 
 mkdir -p "${CAPSULE}/logs"
-apptainer exec --cleanenv "$CONTAINER_IMAGE_PATH" dandi-validate-versions > "${CAPSULE}/logs/container_versions.json"
+apptainer exec --cleanenv "$CONTAINER_IMAGE_PATH" dandi-validation-versions > "${CAPSULE}/logs/container_versions.json"
+
+# Refuse to run unless the image's installed validators make up the version code it was taken for.
+image_version_code="$(dandi-validations version-code --versions-json "${CAPSULE}/logs/container_versions.json")"
+if [ "$image_version_code" != "$VERSION_CODE" ]; then
+    echo "The image's validators make up version code ${image_version_code}, not ${VERSION_CODE}." >&2
+    exit 1
+fi
 
 run_started="$(mktemp)"
 stopped=0

@@ -19,6 +19,7 @@ import xml.etree.ElementTree
 
 import requests
 
+from ._capsule import pipeline_relative_directory
 from ._globals import (
     CODEBASE_URL,
     DANDI_API_URL,
@@ -194,7 +195,8 @@ def render_repository_template(*, dandiset_id: str, codebase_ref: str) -> dict[s
         "codebase_url": CODEBASE_URL,
         "codebase_ref": codebase_ref,
         "pipeline": pipeline.pipeline,
-        "pipeline_path": f"derivatives/dandisets-{dandiset_id[:3]}/dandiset-{dandiset_id}/pipeline-{pipeline.pipeline}",
+        "pipeline_path": pipeline_relative_directory(dandiset_id, pipeline.pipeline).as_posix(),
+        "image": pipeline.container_image,
         "branch": DEFAULT_BRANCH,
     }
     files = {}

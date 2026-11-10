@@ -1,23 +1,21 @@
 """
 Job capsules: one self-contained directory per validation run.
 
-The layout follows DANDI Compute's (see the README of dandi-compute/001697)::
+Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its Dandiset, holding
+job capsules laid out like DANDI Compute's (see the README of dandi-compute/001697)::
 
-    derivatives/
-    └── dandisets-{first 3 digits of the Dandiset ID}/
-        └── dandiset-{Dandiset ID}/
-            └── pipeline-dandi+validate/
-                ├── jobs.tsv, jobs.json  ← one row per capsule, rebuilt after every job
-                └── job-{job ID}/
-                    ├── code/  ← the exact code and inputs the job ran with
-                    ├── logs/  ← all runtime records, for success or failure
-                    ├── derivatives/  ← the validation results (only for a completed run)
-                    └── dataset_description.json  ← provenance
+    {dandiset_id}/
+    ├── dataset_description.json  ← the derivative dataset
+    └── pipeline-dandi+validate/
+        ├── jobs.tsv, jobs.json  ← one row per capsule, rebuilt after every job
+        └── job-{job ID}/
+            ├── code/  ← the exact code and inputs the job ran with
+            ├── logs/  ← all runtime records, for success or failure
+            ├── derivatives/  ← the validation results (only for a completed run)
+            └── dataset_description.json  ← provenance
 
-Validation runs over a whole Dandiset, so capsules sit directly under the Dandiset rather than
-under a ``sub-``/``ses-`` level as DANDI Compute's per-asset pipelines do. Keeping the rest of
-the nesting means the capsules of every Dandiset repository can be collected into one tree
-without colliding.
+Validation runs over a whole Dandiset, so capsules sit directly under the pipeline rather than
+under ``sub-``/``ses-`` levels as DANDI Compute's per-asset pipelines do.
 
 A capsule's lifecycle status is read from what it contains, as DANDI Compute does: ``pending``
 (code only), ``stalled`` (submitted but nothing logged), ``failed`` (logs without results) and
@@ -53,16 +51,17 @@ from ._manifest import (
     write_table,
 )
 from ._pipeline import CAPSULE_CODE_DIRECTORY, TEMPLATES_DIRECTORY, Parameters, Pipeline, load_parameters, load_pipeline
+from ._registry import resolve_digest
 from ._templates import render
+from ._version_code import parse_version_code
 
 SUBMITTED_MARKER_PREFIX = "submitted_date-"
 JOB_STATUSES = ("pending", "stalled", "failed", "successful", "unknown")
 
 
 def pipeline_relative_directory(dandiset_id: str, pipeline: str) -> pathlib.PurePosixPath:
-    return pathlib.PurePosixPath(
-        "derivatives", f"dandisets-{dandiset_id[:3]}", f"dandiset-{dandiset_id}", f"pipeline-{pipeline}"
-    )
+    """Where a pipeline's capsules live in a Dandiset repository: at its root, one per pipeline."""
+    return pathlib.PurePosixPath(f"pipeline-{pipeline}")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -202,7 +201,7 @@ def prepare_capsule(
         dandiset_id=dandiset_id,
         dandiset_version=dandiset_version,
         pipeline=pipeline.pipeline,
-        version=pipeline.bidsy_version,
+        version=pipeline.container_version,
         params=parameters.identifier,
         source_digest=digest,
     )
@@ -222,6 +221,7 @@ def prepare_capsule(
     _write_capsule(
         capsule=capsule,
         pipeline=pipeline,
+        image_digest=resolve_digest(pipeline.container_image, pipeline.container_version),
         parameters=parameters,
         dandiset_version=dandiset_version,
         dandiset_yaml=dandiset_yaml,
@@ -239,6 +239,7 @@ def _write_capsule(
     *,
     capsule: Capsule,
     pipeline: Pipeline,
+    image_digest: str | None,
     parameters: Parameters,
     dandiset_version: str,
     dandiset_yaml: bytes,
@@ -270,7 +271,9 @@ def _write_capsule(
         capsule_path=capsule.relative_path.as_posix(),
         container_name=pipeline.container_name,
         container_version=pipeline.container_version,
-        docker_url=pipeline.docker_url,
+        image_reference=pipeline.image_reference,
+        image_digest=image_digest or "unknown",
+        docker_url=pipeline.docker_url(image_digest),
         sif_url=pipeline.sif_url,
         params_file_name=params_file_path.name,
         assets_file_name=assets_file_path.name,
@@ -296,9 +299,17 @@ def _write_capsule(
             },
             {
                 "Name": "DANDI Validations: Container",
-                "Description": "The dandi-validate runtime, run through Apptainer with datalad containers-run.",
+                "Description": (
+                    "The dandi-validation image, tagged by its validator version code, run through Apptainer "
+                    "with datalad containers-run."
+                ),
                 "Version": pipeline.container_version,
-                "CodeURL": f"{pipeline.container_image}:{pipeline.container_version}",
+                "CodeURL": (f"{pipeline.image_reference}@{image_digest}" if image_digest else pipeline.image_reference),
+                "Container": {
+                    "Type": "docker",
+                    "Tag": pipeline.container_version,
+                    "URI": pipeline.docker_url(image_digest),
+                },
             },
             {
                 "Name": "DANDI Validations: Code",
@@ -318,7 +329,12 @@ def _write_capsule(
             "dandiset_id": capsule.dandiset_id,
             "dandiset_version": dandiset_version,
             "pipeline": pipeline.pipeline,
-            "version": pipeline.bidsy_version,
+            "version": pipeline.container_version,
+            # The six validator versions of the image (the shape of the archive's
+            # `validatedRequiredVersions`, dandi/dandi-archive#2987).
+            "validator_versions": parse_version_code(pipeline.container_version),
+            "image": pipeline.image_reference,
+            "image_digest": image_digest,
             "codebase": _codebase_version().split("+")[0],
             "params": parameters.identifier,
             "params_key": parameters.key,

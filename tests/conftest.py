@@ -25,6 +25,12 @@ def make_asset(path: str, *, sha256: str | None = "a" * 64, size: int = 10, enco
     return asset
 
 
+@pytest.fixture(autouse=True)
+def offline_image_digest(monkeypatch):
+    """Keep capsule preparation from asking GHCR for the image's digest."""
+    monkeypatch.setenv("DANDI_VALIDATIONS_IMAGE_DIGEST", "sha256:" + "0" * 64)
+
+
 @pytest.fixture
 def assets_jsonld() -> bytes:
     assets = [

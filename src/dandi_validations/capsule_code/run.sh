@@ -1,7 +1,7 @@
 #!/bin/bash
 # Validate a Dandiset by streaming, following the recipe at the top of dandi/dandi-cli#1956.
 #
-# This script runs INSIDE the dandi-validate container: submit.sh hands it to
+# This script runs INSIDE the dandi-validation image: submit.sh hands it to
 # `datalad containers-run`, which executes it through Apptainer and records the run. It is copied
 # into every job capsule's code/ directory, so the capsule holds the exact code that ran.
 #
@@ -50,9 +50,10 @@ export GIT_CONFIG_NOSYSTEM=1
 git config --global user.name "dandi-validations"
 git config --global user.email "dandi-validations@users.noreply.github.com"
 
-echo "=== dandi-validate container ==="
-cat /opt/dandi-validate/versions.json 2> /dev/null | python -c \
-    'import json, sys; v = json.load(sys.stdin); print(json.dumps({k: v[k] for k in ("container_version", "dandi_cli", "git_annex", "key_distributions")}, indent=2))' \
+echo "=== dandi-validation image ==="
+python -c \
+    'import json, sys; v = json.load(open(sys.argv[1])); print(json.dumps({k: v[k] for k in ("validator_versions", "tool_versions", "git", "git_annex")}, indent=2))' \
+    /opt/dandi-validation/versions.json \
     || echo "(no version record in this image)"
 
 echo "=== Building the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="

@@ -1,7 +1,7 @@
 name: Validate
 
 # Validates Dandiset {{ dandiset_id }} with `dandi validate --missing-file-content=stream`
-# (dandi/dandi-cli#1956) inside the dandi-validate container from GHCR, run through Apptainer by
+# (dandi/dandi-cli#1956) inside the dandi-validation image from GHCR, run through Apptainer by
 # `datalad containers-run` and tracked by duct. Each run is recorded as a job capsule under
 # {{ pipeline_path }}/.
 #

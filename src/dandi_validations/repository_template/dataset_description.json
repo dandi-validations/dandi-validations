@@ -1,14 +1,18 @@
 {
   "Name": "DANDI Validations: Dandiset {{ dandiset_id }}",
-  "Description": "Records of streaming dandi validate runs over Dandiset {{ dandiset_id }} of the DANDI Archive. Each run is a self-contained job capsule.",
+  "Description": "Records of streaming dandi validate runs over Dandiset {{ dandiset_id }} of the DANDI Archive, as a standalone derivative dataset. Each run is a self-contained job capsule under {{ pipeline_path }}/.",
   "BIDSVersion": "1.10.1",
-  "DatasetType": "study",
+  "DatasetType": "derivative",
   "License": "CC-BY-4.0",
   "GeneratedBy": [
     {
       "Name": "DANDI Validations",
-      "Description": "Runs dandi validate per Dandiset on GitHub Actions and records each run as a job capsule.",
-      "CodeURL": "{{ codebase_url }}"
+      "Description": "Runs dandi validate per Dandiset on GitHub Actions, in the dandi-validation image, and records each run as a job capsule.",
+      "CodeURL": "{{ codebase_url }}",
+      "Container": {
+        "Type": "docker",
+        "URI": "docker://{{ image }}"
+      }
     }
   ],
   "SourceDatasets": [

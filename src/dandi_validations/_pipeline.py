@@ -20,24 +20,26 @@ class Pipeline:
     pipeline: str
     container_name: str
     container_image: str
+    #: The image's tag: its validator version code (see ``_version_code``).
     container_version: str
     dandi_cli_repository: str
     dandi_cli_commit: str
     dandi_cli_reference: str
 
     @property
-    def docker_url(self) -> str:
-        return f"docker://{self.container_image}:{self.container_version}"
+    def image_reference(self) -> str:
+        return f"{self.container_image}:{self.container_version}"
 
     @property
     def sif_url(self) -> str:
         """The same image as an Apptainer SIF, published with ORAS by the build workflow."""
         return f"oras://{self.container_image}:sif-{self.container_version}"
 
-    @property
-    def bidsy_version(self) -> str:
-        """The version with ``-`` replaced by ``+``, as BIDS-style labels in capsule paths require."""
-        return self.container_version.replace("-", "+")
+    def docker_url(self, digest: str | None = None) -> str:
+        """The OCI image, by digest when it is known."""
+        if digest:
+            return f"docker://{self.container_image}@{digest}"
+        return f"docker://{self.image_reference}"
 
     @property
     def dandi_cli_code_url(self) -> str:
