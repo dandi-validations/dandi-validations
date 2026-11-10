@@ -7,7 +7,7 @@
 # (`dandi-validations run ... --push origin`). Then it checks that the capsule succeeded, that
 # every asset was streamed, that the provenance names the image, and that a second run skips.
 #
-# Needs: docker, apptainer, and this package installed (`pip install .`), which brings datalad,
+# Needs: docker, apptainer, and this package installed (`pip install ".[test]"`), which brings datalad,
 # datalad-container, git-annex and con-duct.
 #
 # Usage: scripts/e2e_local.sh [DANDISET_ID] [WORK_DIRECTORY]
