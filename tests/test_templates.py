@@ -25,7 +25,6 @@ def test_repository_template_renders_completely():
     assert set(files) == {
         ".github/workflows/validate.yml",
         ".gitattributes",
-        ".gitignore",
         "README.md",
         "dataset_description.json",
     }

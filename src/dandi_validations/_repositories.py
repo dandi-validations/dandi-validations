@@ -14,12 +14,12 @@ import shutil
 import subprocess
 import tempfile
 import time
-import uuid
 import xml.etree.ElementTree
 
 import requests
 
-from ._capsule import pipeline_relative_directory
+from ._branches import datalad_dataset_files
+from ._capsule import DATASET_DESCRIPTION, capsule_name
 from ._globals import (
     CODEBASE_URL,
     DANDI_API_URL,
@@ -195,7 +195,7 @@ def render_repository_template(*, dandiset_id: str, codebase_ref: str) -> dict[s
         "codebase_url": CODEBASE_URL,
         "codebase_ref": codebase_ref,
         "pipeline": pipeline.pipeline,
-        "pipeline_path": pipeline_relative_directory(dandiset_id, pipeline.pipeline).as_posix(),
+        "capsule_pattern": capsule_name(pipeline.pipeline, "{tag}"),
         "image": pipeline.container_image,
         "branch": DEFAULT_BRANCH,
     }
@@ -212,18 +212,6 @@ def render_repository_template(*, dandiset_id: str, codebase_ref: str) -> dict[s
             content = render(content, **{name: values[name] for name in set(names)})
         files[relative] = content.encode("utf-8")
     return files
-
-
-def _datalad_dataset_files() -> dict[str, bytes]:
-    """What `datalad create` would write, for a repository that is not yet a DataLad dataset."""
-    return {
-        ".datalad/config": f'[datalad "dataset"]\n\tid = {uuid.uuid4()}\n'.encode(),
-        ".datalad/.gitattributes": (
-            "config annex.largefiles=nothing\n"
-            "metadata/aggregate* annex.largefiles=nothing\n"
-            "metadata/objects/** annex.largefiles=(anything)\n"
-        ).encode(),
-    }
 
 
 def _git(command: list[str], cwd: pathlib.Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -252,14 +240,18 @@ def sync_repository(
     clone = work_directory / dandiset_id
     if clone.exists():
         shutil.rmtree(clone)
-    _git(["clone", "--quiet", "--depth", "1", "--no-single-branch", remote_url, str(clone)], cwd=work_directory)
+    _git(["clone", "--quiet", "--depth", "1", remote_url, str(clone)], cwd=work_directory)
     is_empty = _git(["rev-parse", "--verify", "--quiet", "HEAD"], cwd=clone, check=False).returncode != 0
     if is_empty:
         _git(["checkout", "--quiet", "-b", branch], cwd=clone)
 
     files = render_repository_template(dandiset_id=dandiset_id, codebase_ref=codebase_ref)
     if not (clone / ".datalad" / "config").exists():
-        files.update(_datalad_dataset_files())
+        files.update({path: content.encode() for path, content in datalad_dataset_files().items()})
+    # Jobs keep the provenance of every capsule in dataset_description.json, so the template only
+    # starts it.
+    if (clone / DATASET_DESCRIPTION).exists():
+        files.pop(DATASET_DESCRIPTION)
     for relative, content in files.items():
         target = clone / relative
         target.parent.mkdir(parents=True, exist_ok=True)

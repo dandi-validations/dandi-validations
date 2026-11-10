@@ -25,7 +25,7 @@ S3_BASE_URL = "https://dandiarchive.s3.amazonaws.com"
 ASSETS_JSONLD_URL_TEMPLATE = S3_BASE_URL + "/dandisets/{dandiset_id}/{version}/assets.jsonld"
 DANDISET_YAML_URL_TEMPLATE = S3_BASE_URL + "/dandisets/{dandiset_id}/{version}/dandiset.yaml"
 
-#: Key under which job provenance is written into a capsule's ``dataset_description.json``.
+#: Key of the capsules' provenance in a Dandiset repository's ``dataset_description.json``.
 PROVENANCE_KEY = "DandiValidations"
 
 DANDISET_ID_RE = re.compile(r"^\d{6}$")

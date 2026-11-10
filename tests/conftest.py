@@ -26,6 +26,18 @@ def make_asset(path: str, *, sha256: str | None = "a" * 64, size: int = 10, enco
 
 
 @pytest.fixture(autouse=True)
+def git_identity(monkeypatch):
+    """Commits made by the code under test need an identity, which CI runners lack."""
+    for variable, value in {
+        "GIT_AUTHOR_NAME": "dandi-validations tests",
+        "GIT_AUTHOR_EMAIL": "tests@example.org",
+        "GIT_COMMITTER_NAME": "dandi-validations tests",
+        "GIT_COMMITTER_EMAIL": "tests@example.org",
+    }.items():
+        monkeypatch.setenv(variable, value)
+
+
+@pytest.fixture(autouse=True)
 def offline_image_digest(monkeypatch):
     """Keep capsule preparation from asking GHCR for the image's digest."""
     monkeypatch.setenv("DANDI_VALIDATIONS_IMAGE_DIGEST", "sha256:" + "0" * 64)

@@ -10,37 +10,38 @@ Each run happens on this repository's own GitHub Actions runner (the **Validate*
 2. `dandi validate --missing-file-content=stream` validates it, streaming only the parts of each
    file the validators read ([dandi/dandi-cli#1956](https://github.com/dandi/dandi-cli/pull/1956)).
 3. The validation runs inside the `dandi-validation` image from the GitHub Container Registry
-   (`{{ image }}:<version code>`), through Apptainer, with `datalad containers-run`, whose commit
-   records the command, its inputs and its outputs. [duct](https://github.com/con/duct) records
-   its resource usage.
+   (`{{ image }}:{tag}`), through Apptainer, with `datalad containers-run`, whose commit records
+   the command, its inputs and its outputs. [duct](https://github.com/con/duct) records its
+   resource usage.
 
 ## Layout
 
 The repository is a DataLad dataset laid out as a standalone
 [BIDS derivative dataset](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets)
-of the Dandiset, holding one job capsule per run:
+of the Dandiset, with one capsule per `dandi-validation` image. Each capsule is a DataLad
+dataset on its own branch, named by the image's tag (its validator version code), and `main`
+holds a submodule for each of those branches:
 
 ```
-{{ dandiset_id }}/
-├── dataset_description.json  ← the derivative dataset
-└── {{ pipeline_path }}/
-    ├── jobs.tsv  ← one row per job capsule (described by jobs.json)
-    └── job-{YYMMDD}{hash}/
-        ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters,
-        │            dandiset.yaml and assets.tsv (the files that were validated)
-        ├── logs/  ← all runtime records for success or failure: duct's usage and
-        │            output, the image's versions, the GitHub Actions run
-        ├── derivatives/  ← validation.jsonl (all results) and summary.json;
-        │                   present only when the validation completed
-        └── dataset_description.json  ← provenance, with the image's reference and digest
+https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
+├── dataset_description.json  ← the derivative dataset, with every capsule's provenance
+└── {{ capsule_pattern }}/  ← submodule: branch {tag} of this repository
+    ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters,
+    │            dandiset.yaml and assets.tsv (the files that were validated)
+    ├── logs/  ← all runtime records for success or failure: duct's usage and
+    │            output, the image's versions, the GitHub Actions run
+    └── derivatives/  ← validation.jsonl (all results) and summary.json;
+                        present only when the validation completed
 ```
 
-A job is identified by the Dandiset version, the image's validator version code, the parameters
-and the digest of the assets it validated: an unchanged Dandiset is not validated twice by the
-same image. To look at the results of a job:
+A capsule holds the latest validation of the Dandiset with its image. It is not run again while
+the Dandiset's files and metadata are unchanged; when they change, the next run replaces its
+contents in a new commit on its branch, whose history keeps every earlier run and its
+`datalad containers-run` record. To look at a capsule's results:
 
 ```bash
-dandi validate --load {{ pipeline_path }}/job-.../derivatives/validation.jsonl --summary
+git clone --recurse-submodules https://github.com/{{ organization }}/{{ dandiset_id }}
+dandi validate --load {{ dandiset_id }}/{{ capsule_pattern }}/derivatives/validation.jsonl --summary
 ```
 
 This repository's shared files are managed by [{{ organization }}/dandi-validations]({{ codebase_url }}).

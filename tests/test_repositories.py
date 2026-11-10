@@ -36,6 +36,28 @@ def test_sync_initializes_then_is_idempotent_then_updates(tmp_path):
     assert _show(remote, ".datalad/config") == dataset_id  # The dataset keeps its identity
 
 
+def test_sync_leaves_the_provenance_jobs_wrote(tmp_path):
+    remote = _bare(tmp_path, "000123")
+    work = tmp_path / "work"
+    work.mkdir()
+    url = f"file://{remote}"
+    sync_repository(dandiset_id="000123", remote_url=url, codebase_ref="main", work_directory=work)
+
+    # A job records a capsule's provenance in dataset_description.json and pushes it.
+    clone = tmp_path / "job"
+    subprocess.run(["git", "clone", "-q", url, str(clone)], check=True)
+    description = json.loads((clone / "dataset_description.json").read_text())
+    description["DandiValidations"] = {"pipeline-dandi+validate_tag-x": {"version": "x"}}
+    (clone / "dataset_description.json").write_text(json.dumps(description))
+    git = ["git", "-C", str(clone), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "commit", "-q", "-am", "Submit"], check=True)
+    subprocess.run([*git, "push", "-q", "origin", "HEAD:main"], check=True)
+
+    assert sync_repository(dandiset_id="000123", remote_url=url, codebase_ref="v2", work_directory=work)
+    synced = json.loads(_show(remote, "dataset_description.json"))
+    assert synced["DandiValidations"] == {"pipeline-dandi+validate_tag-x": {"version": "x"}}
+
+
 class FakeGitHub:
     def __init__(self, existing):
         self.existing = set(existing)

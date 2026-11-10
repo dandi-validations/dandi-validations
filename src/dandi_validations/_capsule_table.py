@@ -1,9 +1,9 @@
 """
-The ``jobs.tsv`` table of a pipeline directory: one row per job capsule, rebuilt from the capsules.
+The capsules table: one row per capsule of a Dandiset repository, read from the capsule itself.
 
-The table holds nothing a capsule does not, so it is always regenerated rather than edited. Its
-``jobs.json`` sidecar describes the columns, BIDS-style. The collect step concatenates these
-tables across every Dandiset repository of the organization.
+The collect step builds this table for every Dandiset repository of the organization into this
+repository's ``records/capsules.tsv``, with a ``capsules.json`` sidecar describing its columns,
+BIDS-style.
 """
 
 import gzip
@@ -13,9 +13,9 @@ import pathlib
 from ._capsule import SUBMITTED_MARKER_PREFIX, capsule_status, read_provenance
 
 COLUMNS = {
-    "job_id": "The `job-{YYMMDD}{hash}` directory name of the capsule.",
-    "status": "Lifecycle status: pending, stalled, failed, successful or unknown.",
     "dandiset_id": "The six-digit Dandiset that was validated.",
+    "capsule": "The capsule's directory: `pipeline-{pipeline}_tag-{image tag}`.",
+    "status": "Lifecycle status of the capsule's latest run: pending, stalled, failed, successful or unknown.",
     "dandiset_version": "The Dandiset version that was validated (e.g. draft).",
     "pipeline": "The pipeline that formed the capsule.",
     "version": "The dandi-validation image's tag: its validator version code.",
@@ -26,9 +26,9 @@ COLUMNS = {
     "source_digest": "SHA-256 over the registered assets table and dandiset.yaml.",
     "assets": "Number of assets registered in the DataLad dataset that was validated.",
     "skipped_assets": "Number of assets not registered (Zarr, or no SHA-256 digest yet).",
-    "created_at": "When the capsule was formed (UTC).",
-    "claimed_by": "The GitHub Actions run attempt (or host) that ran the capsule.",
-    "run_exit_code": "Exit code of the job (0 for a completed validation, whatever it found).",
+    "created_at": "When the capsule's latest run was formed (UTC).",
+    "claimed_by": "The GitHub Actions run attempt (or host) that ran it.",
+    "run_exit_code": "Exit code of the run (0 for a completed validation, whatever it found).",
     "wall_clock_seconds": "Wall-clock time of `datalad containers-run`, measured by duct.",
     "peak_rss_bytes": "Peak resident memory of the run's process tree, measured by duct.",
     "dandi_validate_exit_code": "Exit code of `dandi validate` itself (1 when it reported errors).",
@@ -67,7 +67,7 @@ def capsule_row(capsule_directory: pathlib.Path) -> dict:
 
     row = {column: "" for column in COLUMNS}
     row.update({key: provenance[key] for key in COLUMNS if key in provenance})
-    row["job_id"] = capsule_directory.name
+    row["capsule"] = capsule_directory.name
     row["status"] = capsule_status(capsule_directory)
     row["claimed_by"] = _claimed_by(capsule_directory)
     row["run_exit_code"] = run.get("exit_code", "")
@@ -108,18 +108,6 @@ def sidecar_bytes() -> bytes:
         "unknown": "Nothing that would place the capsule in the lifecycle was observed.",
     }
     return (json.dumps(sidecar, indent=2) + "\n").encode("utf-8")
-
-
-def write_jobs_table(pipeline_directory: pathlib.Path) -> list[pathlib.Path]:
-    capsule_directories = sorted(
-        path for path in pipeline_directory.iterdir() if path.is_dir() and path.name.startswith("job-")
-    )
-    rows = [capsule_row(path) for path in capsule_directories]
-    table_path = pipeline_directory / "jobs.tsv"
-    sidecar_path = pipeline_directory / "jobs.json"
-    table_path.write_bytes(table_bytes(rows))
-    sidecar_path.write_bytes(sidecar_bytes())
-    return [table_path, sidecar_path]
 
 
 def read_table(content: bytes) -> list[dict]:

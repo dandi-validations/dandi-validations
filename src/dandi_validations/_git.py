@@ -32,7 +32,9 @@ def has_ref(root: pathlib.Path, ref: str) -> bool:
     return run(["git", "rev-parse", "--verify", "--quiet", ref], cwd=root, check=False).returncode == 0
 
 
-def ensure_annex(root: pathlib.Path, *, remote: str = "origin", description: str = "ephemeral job runner") -> None:
+def ensure_annex(
+    root: pathlib.Path, *, remote: str | None = "origin", description: str = "ephemeral job runner"
+) -> None:
     """
     Initialize git-annex in this clone as a private repository, unless it already is initialized.
 
@@ -41,7 +43,7 @@ def ensure_annex(root: pathlib.Path, *, remote: str = "origin", description: str
     """
     if run(["git", "config", "--get", "annex.uuid"], cwd=root, check=False).returncode == 0:
         return
-    if run(["git", "remote", "get-url", remote], cwd=root, check=False).returncode == 0:
+    if remote is not None and run(["git", "remote", "get-url", remote], cwd=root, check=False).returncode == 0:
         run(["git", "fetch", remote, f"+refs/heads/git-annex:refs/remotes/{remote}/git-annex"], cwd=root, check=False)
     run(["git", "config", "annex.private", "true"], cwd=root)
     run(["git", "annex", "init", description], cwd=root)
@@ -58,16 +60,14 @@ def save(root: pathlib.Path, paths: list[pathlib.Path], message: str) -> bool:
 
 def push(root: pathlib.Path, *, remote: str = "origin", branch: str, attempts: int = 4) -> None:
     """
-    Push the branch (and the git-annex branch, when there is one), rebasing onto concurrent pushes.
+    Push HEAD to the branch, rebasing onto concurrent pushes.
 
-    Template updates from the central repository may land while a job runs, so a rejected push
-    is retried after integrating the remote's changes.
+    Template updates from the central repository may land on main while a job runs, so a rejected
+    push is retried after integrating the remote's changes. No git-annex branch is pushed: the
+    capsule branches of a repository share its remote, and record nothing in git-annex anyway.
     """
     for attempt in range(1, attempts + 1):
-        refspecs = [f"HEAD:refs/heads/{branch}"]
-        if has_ref(root, "refs/heads/git-annex"):
-            refspecs.append("refs/heads/git-annex:refs/heads/git-annex")
-        result = run(["git", "push", remote, *refspecs], cwd=root, check=False)
+        result = run(["git", "push", remote, f"HEAD:refs/heads/{branch}"], cwd=root, check=False)
         if result.returncode == 0:
             return
         _log.warning("Push attempt %d failed:\n%s", attempt, result.stderr)
@@ -75,8 +75,5 @@ def push(root: pathlib.Path, *, remote: str = "origin", branch: str, attempts: i
             message = f"Could not push to {remote} after {attempts} attempts:\n{result.stderr}"
             raise RuntimeError(message)
         time.sleep(2**attempt)
-        run(["git", "fetch", remote], cwd=root)
-        if has_ref(root, f"refs/remotes/{remote}/{branch}"):
-            run(["git", "rebase", f"{remote}/{branch}"], cwd=root)
-        if has_ref(root, "refs/heads/git-annex"):
-            run(["git", "annex", "merge"], cwd=root)
+        run(["git", "fetch", remote, branch], cwd=root)
+        run(["git", "rebase", "FETCH_HEAD"], cwd=root)

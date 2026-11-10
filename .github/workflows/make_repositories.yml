@@ -5,7 +5,7 @@ name: Make repositories
 # every one, as bids-dandisets/scripts does for its organization.
 #
 # Needs the `_GITHUB_API_KEY` secret: a token that can create repositories in the organization
-# and push workflow files to them (classic PAT scopes `repo`, `workflow`, `admin:org`; or a
+# and push workflow files to them (classic PAT scopes `repo` and `workflow`; or a
 # fine-grained token with Administration, Contents and Workflows write access).
 
 on:

@@ -9,10 +9,19 @@ import platform
 import subprocess
 import sys
 
-from ._capsule import Capsule, capsule_status, pipeline_relative_directory, prepare_capsule
-from ._git import ensure_annex, push, repository_root, save
+from ._branches import (
+    capsule_branches,
+    checkout_capsule,
+    commit_main,
+    create_capsule,
+    prune_submodules,
+    publish_capsule,
+    register_submodule,
+    remote_url,
+)
+from ._capsule import DATASET_DESCRIPTION, Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
+from ._git import ensure_annex, push, repository_root, run, save
 from ._globals import DEFAULT_BRANCH, DEFAULT_PARAMS_KEY
-from ._jobs_table import write_jobs_table
 
 _log = logging.getLogger(__name__)
 
@@ -58,7 +67,7 @@ def _execute(capsule: Capsule, *, time_limit_minutes: float, log_file_path: path
     with log_file_path.open("w") as log_file:
         process = subprocess.Popen(
             command,
-            cwd=capsule.repository_root,
+            cwd=capsule.path,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -83,29 +92,44 @@ def run_job(
     branch: str | None = None,
     time_limit_minutes: float = 0,
 ) -> int:
+    """
+    Validate a Dandiset in the capsule of the pinned image, from a clone of the repository's main.
+
+    The capsule's branch is fetched (or started), its run is committed to it, and main's
+    submodule for it is pinned to the result, both when the run is claimed and when it is recorded.
+    With ``push_to``, both branches are pushed at each of those points.
+    """
     root = repository_root(path)
     branch = branch or DEFAULT_BRANCH
-    ensure_annex(root, remote=push_to or "origin")
+    remote = push_to or "origin"
 
-    result = prepare_capsule(
-        repository_root=root,
-        dandiset_id=dandiset_id,
-        dandiset_version=dandiset_version,
-        params_key=params_key,
-        force=force,
+    plan = plan_capsule(
+        repository_root=root, dandiset_id=dandiset_id, dandiset_version=dandiset_version, params_key=params_key
     )
-    _log.info(result.reason)
-    print(result.reason, flush=True)
-    capsule = result.capsule
-    if capsule is None:
+    if isinstance(plan, str):
+        print(plan, flush=True)
+        return 0
+    capsule = plan.capsule
+    if not checkout_capsule(root, capsule, remote if push_to else None) and not (capsule.path / ".git").exists():
+        create_capsule(capsule)
+    if not force and is_up_to_date(plan):
+        print(f"{capsule.name} already validated these inputs; nothing to do (use --force to validate again).")
         return 0
 
+    write_capsule(plan)
+    ensure_annex(capsule.path, remote=None)
+    print(f"Formed {capsule.name} for {plan.number_of_assets} assets.", flush=True)
+
     # Claim the capsule before running it, so that a run that never reports back reads as stalled.
-    save(
-        root, [capsule.path], f"Submit {capsule.job_id}: dandi validate of Dandiset {dandiset_id} ({dandiset_version})"
+    # This also replaces the results of the capsule's previous run, which stay in its branch's history.
+    _commit_and_publish(
+        root,
+        capsule,
+        paths=[capsule.path],
+        message=f"Submit {capsule.name}: dandi validate of Dandiset {dandiset_id} ({dandiset_version})",
+        push_to=push_to,
+        branch=branch,
     )
-    if push_to:
-        push(root, remote=push_to, branch=branch)
 
     started_at = datetime.datetime.now(tz=datetime.timezone.utc)
     exit_code = _execute(
@@ -124,13 +148,40 @@ def run_job(
     (capsule.logs_directory / "run.json").write_text(json.dumps(run_record, indent=2) + "\n")
 
     status = capsule_status(capsule.path)
-    pipeline_directory = root / pipeline_relative_directory(dandiset_id, capsule.pipeline)
-    table_paths = write_jobs_table(pipeline_directory)
-    save(root, [capsule.logs_directory, *table_paths], f"Record {capsule.job_id} ({status})")
-    if push_to:
-        push(root, remote=push_to, branch=branch)
+    _commit_and_publish(
+        root,
+        capsule,
+        paths=[capsule.logs_directory],
+        message=f"Record {capsule.name} ({status})",
+        push_to=push_to,
+        branch=branch,
+    )
 
-    print(f"{capsule.job_id}: {status} (exit code {exit_code})", flush=True)
+    print(f"{capsule.name}: {status} (exit code {exit_code})", flush=True)
     if status == "successful":
         return 0
     return exit_code or 1
+
+
+def _commit_and_publish(
+    root: pathlib.Path,
+    capsule: Capsule,
+    *,
+    paths: list[pathlib.Path],
+    message: str,
+    push_to: str | None,
+    branch: str,
+) -> None:
+    """Commit the capsule's branch, then pin main's submodule for it (pushing both with ``push_to``)."""
+    save(capsule.path, paths, message)
+    if push_to:
+        commit = publish_capsule(root, capsule, push_to)
+        url = remote_url(root, push_to)
+        prune_submodules(root, branches=capsule_branches(root, push_to), pipeline=capsule.pipeline)
+    else:
+        commit = run(["git", "rev-parse", "HEAD"], cwd=capsule.path).stdout.strip()
+        url = remote_url(root, "origin") or f"./{capsule.name}"
+    register_submodule(root, capsule, url=url, commit=commit)
+    commit_main(root, [DATASET_DESCRIPTION], message)
+    if push_to:
+        push(root, remote=push_to, branch=branch)

@@ -44,7 +44,8 @@ if [ ! -s "$SIF" ]; then
     apptainer build --force "$SIF" "docker-daemon://${IMAGE}:${CODE}"
 fi
 # The image is not in a registry, so record its local ID as its digest.
-DANDI_VALIDATIONS_IMAGE_DIGEST="$(docker image inspect --format '{{.Id}}' "${IMAGE}:${CODE}" 2> /dev/null || echo "sha256:local")"
+DANDI_VALIDATIONS_IMAGE_DIGEST="$(docker image inspect --format '{{.Id}}' "${IMAGE}:${CODE}" 2> /dev/null)" \
+    || DANDI_VALIDATIONS_IMAGE_DIGEST="sha256:local"
 export DANDI_VALIDATIONS_IMAGE_DIGEST
 
 REMOTE="${WORK_DIRECTORY}/remotes/${DANDISET_ID}.git"
@@ -64,28 +65,44 @@ git clone --quiet "$REMOTE" "$CLONE"
 cd "$CLONE"
 dandi-validations run --dandiset-id "$DANDISET_ID" --push origin --time-limit-minutes 60
 
-python - "pipeline-dandi+validate" "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" <<'EOF'
-import csv, json, pathlib, sys
+python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
+import json, pathlib, subprocess, sys
 
-pipeline_directory, image, code, digest = pathlib.Path(sys.argv[1]), *sys.argv[2:]
-assert json.loads(pathlib.Path("dataset_description.json").read_text())["DatasetType"] == "derivative"
-rows = list(csv.DictReader((pipeline_directory / "jobs.tsv").open(), delimiter="\t"))
-assert len(rows) == 1 and rows[0]["status"] == "successful", rows
-assert rows[0]["version"] == code, rows
-capsule = pipeline_directory / rows[0]["job_id"]
-provenance = json.loads((capsule / "dataset_description.json").read_text())["DandiValidations"]
+from dandi_validations._capsule import read_provenance
+from dandi_validations._capsule_table import capsule_row
+
+image, code, digest, remote = sys.argv[1:]
+
+
+def git(*arguments):
+    return subprocess.run(["git", "-C", remote, *arguments], capture_output=True, text=True, check=True).stdout
+
+
+name = f"pipeline-dandi+validate_tag-{code}"
+# main: the single dataset_description.json, and the capsule's submodule pinned to its branch.
+assert git("ls-tree", "main", name).split()[:3] == ["160000", "commit", git("rev-parse", code).strip()]
+assert f"branch = {code}" in git("show", "main:.gitmodules")
+assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] == "derivative"
+# The branch named by the tag: the capsule at its root, its image's registration and its run record.
+files = set(git("ls-tree", "-r", "--name-only", code).split())
+assert {".datalad/environments/dandi-validation/image", "code/submit.sh", "derivatives/summary.json"} <= files
+assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
+assert not any(path.startswith("pipeline-") or path == "dataset_description.json" for path in files), files
+assert "[DATALAD RUNCMD]" in git("log", "--format=%s", code)
+
+capsule = pathlib.Path.cwd() / name
+provenance = read_provenance(capsule)
 assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] == digest, provenance
+row = capsule_row(capsule)
+assert row["status"] == "successful", row
 summary = json.loads((capsule / "derivatives" / "summary.json").read_text())
-assets = int(rows[0]["assets"])
-assert summary["files_streamed"] == assets, (summary["files_streamed"], assets)
+assert summary["files_streamed"] == row["assets"], (summary["files_streamed"], row["assets"])
 assert summary["files_missing_content"] == 0, summary
-for name in ("duct_info.json", "duct_usage.jsonl", "container_versions.json", "run.json", "submit.log"):
-    assert (capsule / "logs" / name).exists(), name
 print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
 EOF
 
-git log --format='%s' | grep -q '^\[DATALAD RUNCMD\]'
 git -C "$REMOTE" log --oneline main | head -n 5
+git -C "$REMOTE" log --oneline "$CODE" | head -n 5
 
 # A second run finds the successful capsule and does nothing.
 dandi-validations run --dandiset-id "$DANDISET_ID" --push origin | grep -q "already validated"

@@ -55,6 +55,10 @@ def build_version_code(versions: Mapping[str, str]) -> str:
     return "-".join(entries)
 
 
+def is_version_code(text: str) -> bool:
+    return _VERSION_CODE_RE.fullmatch(text) is not None
+
+
 def parse_version_code(version_code: str) -> dict[str, str]:
     match = _VERSION_CODE_RE.fullmatch(version_code)
     if match is None:

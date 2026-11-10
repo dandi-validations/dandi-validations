@@ -1,55 +1,74 @@
-"""Collect the ``jobs.tsv`` tables of every Dandiset repository into this repository's ``records/``."""
+"""
+Collect the capsules of every Dandiset repository into this repository's ``records/``.
+
+Each repository's main is cloned shallowly, then each capsule branch its submodules point at,
+and every capsule becomes one row of ``records/capsules.tsv``.
+"""
 
 import concurrent.futures
+import logging
 import pathlib
+import subprocess
+import tempfile
 
-import requests
+from ._capsule import list_capsules
+from ._capsule_table import capsule_row, sidecar_bytes, table_bytes
+from ._globals import ORGANIZATION
 
-from ._capsule import pipeline_relative_directory
-from ._globals import DEFAULT_BRANCH, ORGANIZATION
-from ._jobs_table import COLUMNS, read_table, sidecar_bytes, table_bytes
-from ._pipeline import load_pipeline
+_log = logging.getLogger(__name__)
 
-RAW_URL_TEMPLATE = "https://raw.githubusercontent.com/{organization}/{repository}/{branch}/{path}"
+DEFAULT_CLONE_URL_TEMPLATE = "https://github.com/{organization}/{repository}.git"
 
 
-def fetch_jobs_table(
+def _clone(url: str, destination: pathlib.Path, *, branch: str | None = None) -> bool:
+    command = ["git", "clone", "--quiet", "--depth", "1"]
+    if branch is not None:
+        command += ["--branch", branch, "--single-branch"]
+    result = subprocess.run([*command, url, str(destination)], capture_output=True, text=True)
+    if result.returncode != 0:
+        _log.warning("Could not clone %s%s: %s", url, f" ({branch})" if branch else "", result.stderr.strip())
+    return result.returncode == 0
+
+
+def _submodule_branches(main: pathlib.Path) -> dict[str, str]:
+    """Submodule path → branch, from main's .gitmodules."""
+    result = subprocess.run(
+        ["git", "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.(path|branch)$"],
+        cwd=main,
+        capture_output=True,
+        text=True,
+    )
+    settings = {}
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition(" ")
+        name, _, setting = key.removeprefix("submodule.").rpartition(".")
+        settings.setdefault(name, {})[setting] = value
+    return {entry["path"]: entry["branch"] for entry in settings.values() if "path" in entry and "branch" in entry}
+
+
+def collect_repository(
     dandiset_id: str,
     *,
+    work_directory: pathlib.Path,
     organization: str = ORGANIZATION,
-    branch: str = DEFAULT_BRANCH,
-    session: requests.Session | None = None,
+    clone_url_template: str = DEFAULT_CLONE_URL_TEMPLATE,
 ) -> list[dict]:
-    session = session or requests.Session()
-    pipeline = load_pipeline().pipeline
-    path = pipeline_relative_directory(dandiset_id, pipeline) / "jobs.tsv"
-    url = RAW_URL_TEMPLATE.format(organization=organization, repository=dandiset_id, branch=branch, path=path)
-    response = session.get(url, timeout=60)
-    if response.status_code == 404:
+    main = work_directory / dandiset_id
+    url = clone_url_template.format(organization=organization, repository=dandiset_id)
+    if not _clone(url, main):
         return []
-    response.raise_for_status()
-    return read_table(response.content)
-
-
-def latest_rows(rows: list[dict]) -> list[dict]:
-    """The most recently formed capsule of each Dandiset (job IDs sort by date)."""
-    latest = {}
-    for row in rows:
-        dandiset_id = row.get("dandiset_id", "")
-        if dandiset_id not in latest or row["job_id"] > latest[dandiset_id]["job_id"]:
-            latest[dandiset_id] = row
-    return [latest[dandiset_id] for dandiset_id in sorted(latest)]
+    for path, branch in _submodule_branches(main).items():
+        destination = main / path
+        if destination.exists():
+            destination.rmdir()  # The empty directory of an uninitialized submodule
+        _clone(url, destination, branch=branch)
+    return [capsule_row(capsule) for capsule in list_capsules(main)]
 
 
 def write_records(rows: list[dict], output_directory: pathlib.Path) -> list[pathlib.Path]:
     output_directory.mkdir(parents=True, exist_ok=True)
-    rows = sorted(rows, key=lambda row: (row.get("dandiset_id", ""), row["job_id"]))
-    paths = {
-        "jobs.tsv": table_bytes(rows),
-        "jobs.json": sidecar_bytes(),
-        "latest.tsv": table_bytes(latest_rows(rows)),
-        "latest.json": sidecar_bytes(),
-    }
+    rows = sorted(rows, key=lambda row: (row.get("dandiset_id", ""), row["capsule"]))
+    paths = {"capsules.tsv": table_bytes(rows), "capsules.json": sidecar_bytes()}
     written = []
     for name, content in paths.items():
         path = output_directory / name
@@ -59,13 +78,26 @@ def write_records(rows: list[dict], output_directory: pathlib.Path) -> list[path
 
 
 def collect(
-    *, dandiset_ids: list[str], output_directory: pathlib.Path, organization: str = ORGANIZATION, workers: int = 16
+    *,
+    dandiset_ids: list[str],
+    output_directory: pathlib.Path,
+    organization: str = ORGANIZATION,
+    clone_url_template: str = DEFAULT_CLONE_URL_TEMPLATE,
+    workers: int = 8,
 ) -> list[pathlib.Path]:
-    session = requests.Session()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        tables = executor.map(
-            lambda dandiset_id: fetch_jobs_table(dandiset_id, organization=organization, session=session),
-            dandiset_ids,
-        )
-        rows = [{column: row.get(column, "n/a") for column in COLUMNS} for table in tables for row in table]
+    with tempfile.TemporaryDirectory(prefix="dandi-validations-collect-") as temporary_directory:
+        work_directory = pathlib.Path(temporary_directory)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            tables = list(
+                executor.map(
+                    lambda dandiset_id: collect_repository(
+                        dandiset_id,
+                        work_directory=work_directory,
+                        organization=organization,
+                        clone_url_template=clone_url_template,
+                    ),
+                    dandiset_ids,
+                )
+            )
+    rows = [row for table in tables for row in table]
     return write_records(rows, output_directory)

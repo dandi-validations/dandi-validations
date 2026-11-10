@@ -1,16 +1,17 @@
 #!/bin/bash
-# DANDI Validations job capsule {{ job_id }}
+# DANDI Validations capsule {{ capsule_name }}
 #
 #   What:      dandi validate, streaming (dandi/dandi-cli#1956), of Dandiset {{ dandiset_id }} ({{ dandiset_version }})
 #   Image:     {{ image_reference }}
 #              digest {{ image_digest }}
 #              ({{ sif_url }} as an Apptainer SIF)
-#   Where:     a GitHub Actions runner of https://github.com/{{ organization }}/{{ dandiset_id }}
+#   Where:     a GitHub Actions runner of https://github.com/{{ organization }}/{{ dandiset_id }},
+#              in the capsule's DataLad dataset: branch {{ branch }}
 #
-# Run from anywhere inside that repository's DataLad dataset. This registers the container with
+# Run from anywhere inside the capsule's dataset. This registers the container with
 # datalad-container and executes code/run.sh in it through Apptainer with
 # `datalad containers-run`, wrapped in duct to record resource usage. The run commit records the
-# command, its inputs and its outputs (this capsule's derivatives/). duct's records go to logs/.
+# command, its inputs and its outputs (derivatives/). duct's records go to logs/.
 #
 # A failed run must not leave a partial output behind, since any file under the capsule's
 # derivatives/ marks it successful. Its logs are kept either way, which marks it failed.
@@ -18,7 +19,8 @@
 
 set -euo pipefail
 
-CAPSULE="{{ capsule_path }}"
+# The capsule is the root of its own dataset.
+CAPSULE="."
 DANDISET_ID="{{ dandiset_id }}"
 CONTAINER_NAME="{{ container_name }}"
 VERSION_CODE="{{ container_version }}"
@@ -101,11 +103,11 @@ stop_run() {
 }
 
 run_status=0
-duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "{{ job_id }}: dandi validate ${DANDISET_ID}" \
+duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "{{ capsule_name }}: dandi validate ${DANDISET_ID}" \
     datalad containers-run \
         --container-name "$CONTAINER_NAME" \
         --explicit \
-        --message "{{ job_id }}: dandi validate (streaming) of Dandiset ${DANDISET_ID} ({{ dandiset_version }})" \
+        --message "{{ capsule_name }}: dandi validate (streaming) of Dandiset ${DANDISET_ID} ({{ dandiset_version }})" \
         --input "${CAPSULE}/code/run.sh" \
         --input "${CAPSULE}/code/summarize.py" \
         --input "${CAPSULE}/code/{{ params_file_name }}" \
