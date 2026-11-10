@@ -1,8 +1,13 @@
 """
-Summarize the JSON Lines results of `dandi validate` into derivatives/summary.json.
+Summarize the JSON Lines results of `dandi validate` into derivatives/summary.json, and write the
+results themselves in a fixed order.
 
-Runs inside the dandi-validation image (called by run.sh) and uses only the standard library,
-so that it reads the records exactly as dandi-cli wrote them.
+`dandi validate --jobs N` writes each file's results as its worker finishes, so their order
+depends on the machine. The recorded validation.jsonl is sorted by file, then by issue ID, so
+that the same results always make the same file and reruns can be compared with `git diff`. Each
+line is kept exactly as dandi-cli wrote it.
+
+Runs inside the dandi-validation image (called by run.sh) and uses only the standard library.
 """
 
 import argparse
@@ -22,6 +27,26 @@ def _relative(path: str | None, dandiset_path: pathlib.Path) -> str | None:
         return pathlib.Path(path).resolve().relative_to(dandiset_path).as_posix()
     except ValueError:
         return path
+
+
+def _ranked(counter: collections.Counter) -> list[tuple[str, int]]:
+    """Most common first; ties by name, so that the order never depends on the results' order."""
+    return sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+
+
+def sort_results(results_file: pathlib.Path, output: pathlib.Path) -> None:
+    """Write the results sorted by file, then issue ID, then the whole record, lines unchanged."""
+    keyed = []
+    with results_file.open() as stream:
+        for line in stream:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            keyed.append((record.get("path") or "", record.get("id") or "", line.rstrip("\n")))
+    keyed.sort()
+    with output.open("w") as stream:
+        for _, _, line in keyed:
+            stream.write(line + "\n")
 
 
 def summarize(results_file: pathlib.Path, dandiset_path: pathlib.Path, exit_code: int) -> dict:
@@ -62,10 +87,10 @@ def summarize(results_file: pathlib.Path, dandiset_path: pathlib.Path, exit_code
         "dandi_validate_exit_code": exit_code,
         "total_results": total,
         "by_severity": {severity: by_severity.get(severity, 0) for severity in SEVERITIES},
-        "by_validator": dict(by_validator.most_common()),
-        "by_standard": dict(by_standard.most_common()),
+        "by_validator": dict(_ranked(by_validator)),
+        "by_standard": dict(_ranked(by_standard)),
         "by_id": {
-            issue_id: {"count": count, "severity": by_id_severity[issue_id]} for issue_id, count in by_id.most_common()
+            issue_id: {"count": count, "severity": by_id_severity[issue_id]} for issue_id, count in _ranked(by_id)
         },
         "files_streamed": streamed,
         "files_missing_content": missing,
@@ -78,11 +103,14 @@ def main() -> None:
     parser.add_argument("--results", type=pathlib.Path, required=True)
     parser.add_argument("--dandiset-path", type=pathlib.Path, required=True)
     parser.add_argument("--exit-code", type=int, required=True)
-    parser.add_argument("--output", type=pathlib.Path, required=True)
+    parser.add_argument("--output", type=pathlib.Path, required=True, help="Where to write summary.json.")
+    parser.add_argument("--sorted-results", type=pathlib.Path, help="Where to write the results, sorted.")
     arguments = parser.parse_args()
 
     summary = summarize(arguments.results, arguments.dandiset_path, arguments.exit_code)
     arguments.output.write_text(json.dumps(summary, indent=2) + "\n")
+    if arguments.sorted_results is not None:
+        sort_results(arguments.results, arguments.sorted_results)
 
 
 if __name__ == "__main__":

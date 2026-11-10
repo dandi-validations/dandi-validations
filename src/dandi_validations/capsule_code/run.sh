@@ -12,7 +12,8 @@
 #      nothing is downloaded.
 #   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
-#   3. Write the results (JSON Lines) and a summary to the capsule's derivatives/ directory.
+#   3. Write the results (JSON Lines, sorted by file and issue so that their order does not depend
+#      on the machine) and a summary to the capsule's derivatives/ directory.
 #
 # `dandi validate` exits 1 whenever it reports an error-level issue, which is a successful
 # validation here. It writes --output only once every file has been validated, so the
@@ -95,6 +96,6 @@ python "${CODE_DIRECTORY}/summarize.py" \
     --results "$RESULTS_FILE" \
     --dandiset-path "$SOURCE_DATASET" \
     --exit-code "$validate_status" \
-    --output "${OUTPUT_DIRECTORY}/summary.json"
-cp "$RESULTS_FILE" "${OUTPUT_DIRECTORY}/validation.jsonl"
+    --output "${OUTPUT_DIRECTORY}/summary.json" \
+    --sorted-results "${OUTPUT_DIRECTORY}/validation.jsonl"
 cat "${OUTPUT_DIRECTORY}/summary.json"

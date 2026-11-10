@@ -39,3 +39,27 @@ def test_summarize(tmp_path):
     assert summary["files_streamed"] == 2 and summary["files_missing_content"] == 1
     assert summary["files_with_issues"] == 3
     assert summary["dandi_validate_exit_code"] == 1
+
+
+def test_sorted_results_do_not_depend_on_the_order_of_the_results(tmp_path):
+    # `dandi validate --jobs N` writes each file's results as its worker finishes.
+    records = [
+        _record("pynwb.x", "WARNING", "/capsule/000006/sub-02/b.nwb", "pynwb", "NWB"),
+        _record("DANDI.FILE_CONTENT_STREAMED", "INFO", "/capsule/000006/sub-02/b.nwb", "dandi", "DANDI-LAYOUT"),
+        _record("NWBI.check_subject_age", "ERROR", "/capsule/000006/sub-01/a.nwb"),
+        _record("DANDI.FILE_CONTENT_STREAMED", "INFO", "/capsule/000006/sub-01/a.nwb", "dandi", "DANDI-LAYOUT"),
+    ]
+    lines = [json.dumps(record) for record in records]
+    outputs = []
+    for index, order in enumerate((lines, lines[::-1], lines[2:] + lines[:2])):
+        results = tmp_path / f"validation-{index}.jsonl"
+        results.write_text("\n".join(order) + "\n\n")
+        output = tmp_path / f"sorted-{index}.jsonl"
+        summarize_module.sort_results(results, output)
+        outputs.append(output.read_text())
+        assert summarize_module.summarize(results, tmp_path, exit_code=1) == summarize_module.summarize(
+            tmp_path / "validation-0.jsonl", tmp_path, exit_code=1
+        )
+    assert outputs[0] == outputs[1] == outputs[2]
+    # By file, then by issue ID; each line as dandi-cli wrote it.
+    assert outputs[0] == "".join(line + "\n" for line in (lines[3], lines[2], lines[1], lines[0]))

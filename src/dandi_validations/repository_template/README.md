@@ -31,7 +31,7 @@ https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
     │            dandiset.yaml and assets.tsv (the files that were validated)
     ├── logs/  ← all runtime records for success or failure: duct's usage and
     │            output, the image's versions, the GitHub Actions run
-    ├── derivatives/  ← validation.jsonl (all results) and summary.json;
+    ├── derivatives/  ← validation.jsonl (all results, by file and issue) and summary.json;
     │                   present only when the validation completed
     ├── envs/dandi-validation/image  ← the image's registration (annexed; on GHCR)
     └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset

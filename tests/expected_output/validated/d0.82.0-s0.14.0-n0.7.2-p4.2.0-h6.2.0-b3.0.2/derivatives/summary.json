@@ -31,42 +31,6 @@
       "count": 53,
       "severity": "INFO"
     },
-    "pynwb.root/general/experimenter (general/experimenter): incorrect shape - expected an array of shape '[None]', got non-array data 'Mike Economo'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.root/general/related_publications (general/related_publications): incorrect shape - expected an array of shape '[None]', got non-array data 'doi:10.1038/s41586-018-0642-9'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex/description (units/spike_times_index): argument missing": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.Units/spike_times_index (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex/description (units/electrodes_index): argument missing": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.Units/electrodes_index (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "NWBI.check_units_resolution_is_set": {
-      "count": 53,
-      "severity": "WARNING"
-    },
     "NWBI.During evaluation of 'check_units_table_duration' - <class 'TypeError'>: Indexing arrays must have integer dtypes": {
       "count": 53,
       "severity": "ERROR"
@@ -76,6 +40,42 @@
       "severity": "WARNING"
     },
     "NWBI.check_subject_age": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "NWBI.check_units_resolution_is_set": {
+      "count": 53,
+      "severity": "WARNING"
+    },
+    "pynwb.Units/electrodes_index (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.Units/spike_times_index (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.VectorIndex (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.VectorIndex (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.VectorIndex/description (units/electrodes_index): argument missing": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.VectorIndex/description (units/spike_times_index): argument missing": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.root/general/experimenter (general/experimenter): incorrect shape - expected an array of shape '[None]', got non-array data 'Mike Economo'": {
+      "count": 53,
+      "severity": "ERROR"
+    },
+    "pynwb.root/general/related_publications (general/related_publications): incorrect shape - expected an array of shape '[None]', got non-array data 'doi:10.1038/s41586-018-0642-9'": {
       "count": 53,
       "severity": "ERROR"
     },

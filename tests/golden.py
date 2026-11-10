@@ -10,6 +10,8 @@ To regenerate the expected output after an intended change, run the tests with
 
 import dataclasses
 import datetime
+import difflib
+import itertools
 import json
 import os
 import pathlib
@@ -178,7 +180,17 @@ def assert_matches_expected(actual: pathlib.Path, expected: pathlib.Path) -> Non
     for relative in sorted(expected_files):
         actual_content = (actual / relative).read_text()
         expected_content = (expected / relative).read_text()
-        assert actual_content == expected_content, f"Content of {relative} differs from {expected / relative}."
+        if actual_content != expected_content:
+            # Show where, so that a mismatch on a CI runner can be read from its log.
+            diff = difflib.unified_diff(
+                expected_content.splitlines(),
+                actual_content.splitlines(),
+                fromfile=f"expected/{relative}",
+                tofile=f"actual/{relative}",
+                lineterm="",
+            )
+            shown = list(itertools.islice(diff, 60))
+            raise AssertionError(f"Content of {relative} differs from {expected / relative}:\n" + "\n".join(shown))
 
 
 def check_validated(repository: pathlib.Path, tag: str, work: pathlib.Path) -> None:
