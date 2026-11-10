@@ -12,7 +12,7 @@ run is recorded in a capsule on the branch named by the image's validator versio
 - ``build_version_code`` and ``parse_version_code`` handle the images' tags.
 """
 
-from ._branches import capsule_branches, checkout_capsule, prune_submodules, remote_heads
+from ._branches import capsule_branches, checkout_capsule, prune_submodules, register_image_url, remote_heads
 from ._capsule import (
     Capsule,
     PrepareResult,
@@ -77,6 +77,7 @@ __all__ = [
     "read_capsule_table",
     "read_dataset_description",
     "read_provenance",
+    "register_image_url",
     "remote_heads",
     "render_repository_template",
     "render_template",

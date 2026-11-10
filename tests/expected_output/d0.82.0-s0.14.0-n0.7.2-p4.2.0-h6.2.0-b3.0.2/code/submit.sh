@@ -5,6 +5,7 @@
 #   Image:     ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2
 #              digest sha256:0000000000000000000000000000000000000000000000000000000000000000
 #              (oras://ghcr.io/dandi-validations/dandi-validation:sif-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2 as an Apptainer SIF)
+#              (the same SIF, which git-annex downloads: https://github.com/dandi-validations/dandi-validations/releases/download/sif-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2/dandi-validation_d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2.sif)
 #   Where:     a GitHub Actions runner of https://github.com/dandi-validations/000006,
 #              in the capsule's DataLad dataset: branch d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2
 #

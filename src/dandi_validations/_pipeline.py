@@ -5,6 +5,8 @@ import hashlib
 import json
 import pathlib
 
+from ._globals import CODEBASE_URL
+
 PACKAGE_DIRECTORY = pathlib.Path(__file__).parent
 PIPELINE_FILE_PATH = PACKAGE_DIRECTORY / "pipeline.json"
 PARAMS_DIRECTORY = PACKAGE_DIRECTORY / "params"
@@ -70,6 +72,23 @@ class Pipeline:
 
         """
         return f"oras://{self.container_image}:sif-{self.container_version}"
+
+    @property
+    def sif_release_url(self) -> str:
+        """
+        Locate the same SIF where it downloads without a token, which git-annex needs.
+
+        The build workflow publishes it, with its SHA-256 at the same URL plus ``.sha256``, as the
+        release ``sif-<version code>`` of this codebase's repository.
+
+        Returns
+        -------
+        str
+            The ``https://`` URL of the SIF.
+
+        """
+        tag = f"sif-{self.container_version}"
+        return f"{CODEBASE_URL}/releases/download/{tag}/{self.container_name}_{self.container_version}.sif"
 
     @property
     def dandi_cli_code_url(self) -> str:

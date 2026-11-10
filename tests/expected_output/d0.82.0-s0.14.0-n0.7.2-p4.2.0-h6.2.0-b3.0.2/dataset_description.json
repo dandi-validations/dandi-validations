@@ -23,7 +23,7 @@
     {
       "Name": "DANDI Validations: Code",
       "Description": "Orchestration of validation jobs on GitHub Actions.",
-      "Version": "v0.1.1+0000000000000000000000000000000000000000",
+      "Version": "v0.2.0+0000000000000000000000000000000000000000",
       "CodeURL": "https://github.com/dandi-validations/dandi-validations"
     }
   ],
@@ -70,8 +70,8 @@
       "code_url": "https://github.com/dandi/dandi-cli/tree/bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
       "reference": "https://github.com/dandi/dandi-cli/pull/1956"
     },
-    "codebase": "v0.1.1",
-    "codebase_version": "v0.1.1+0000000000000000000000000000000000000000",
+    "codebase": "v0.2.0",
+    "codebase_version": "v0.2.0+0000000000000000000000000000000000000000",
     "created_at": "2026-11-05T20:31:05+00:00"
   }
 }

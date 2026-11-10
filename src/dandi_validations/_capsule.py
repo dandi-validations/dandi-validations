@@ -703,6 +703,7 @@ def _write_code(  # noqa: PLR0913
         image_digest=image_digest or "unknown",
         docker_url=pipeline.docker_url(image_digest),
         sif_url=pipeline.sif_url,
+        sif_release_url=pipeline.sif_release_url,
         params_file_name=params_file_path.name,
         assets_file_name=assets_file_path.name,
     )
