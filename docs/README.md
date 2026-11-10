@@ -4,8 +4,7 @@ The overview is in the [README](../README.md).
 
 ## Setting up
 
-1. Add the `_GITHUB_API_KEY` organization or repository secret, used only by **Make repositories** and **Dispatch validations**.
-   It must be a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token), which starts with `github_pat_`.
+1. Add the `_GITHUB_API_KEY` repository secret, a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token).
    Classic tokens are refused.
    Its resource owner is the `dandi-validations` organization, with access to all its repositories, so that it covers the repositories it creates.
    It needs these repository permissions, all read and write: Administration (to create repositories), Contents (to push the template), Workflows (to push workflow files) and Actions (to dispatch workflows).
