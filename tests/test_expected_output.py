@@ -290,6 +290,12 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
     With ``claimed``, the capsule has been claimed but not run. It is compared with what the
     expected output holds besides the run's outputs, and the files the run changes are only
     checked to be there. Regenerating then writes only what the claimed capsule holds.
+
+    Raises
+    ------
+    AssertionError
+        If a file differs, showing the start of the difference.
+
     """
     actual_files = {path.relative_to(actual) for path in actual.rglob("*") if path.is_file()}
     if REGENERATE and claimed:
