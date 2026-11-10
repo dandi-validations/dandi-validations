@@ -18,9 +18,9 @@ INFO:    fuse2fs not found, will not be able to mount EXT3 filesystems
 INFO:    gocryptfs not found, will not be able to use gocryptfs
 INFO:    Converting SIF file to temporary sandbox...
 INFO:    Cleaning up image...
-2026-11-10T06:45:22+0000 [INFO    ] con-duct: python-dotenv not installed, skipping .env file loading
-2026-11-10T06:45:22+0000 [INFO    ] con-duct: duct 0.23.0 is executing "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/summarize.py --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'"...
-2026-11-10T06:45:22+0000 [INFO    ] con-duct: Log files will be written to ./logs/duct_
+2026-11-10T16:11:29+0000 [INFO    ] con-duct: python-dotenv not installed, skipping .env file loading
+2026-11-10T16:11:29+0000 [INFO    ] con-duct: duct 0.23.0 is executing "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'"...
+2026-11-10T16:11:29+0000 [INFO    ] con-duct: Log files will be written to ./logs/duct_
 [INFO] Making sure inputs are available (this may take some time) 
 [INFO] == Command start (output follows) ===== 
 INFO:    squashfuse not found, will not be able to mount SIF or other squashfs files
@@ -125,288 +125,212 @@ action summary:
   save (ok: 1)
 Registered 53 annexed files (none downloaded).
 === Validating Dandiset 000006 (--missing-file-content=stream, -J 8) ===
-2026-11-10 06:45:33,854 [    INFO] Validating 53 files
-2026-11-10 06:45:45,537 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
-2026-11-10 06:45:45,637 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
-2026-11-10 06:45:46,227 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
-2026-11-10 06:45:46,266 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
-2026-11-10 06:45:46,412 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:39,817 [    INFO] Validating 53 files
+2026-11-10 16:11:51,538 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:52,343 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:52,471 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:52,736 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:46,512 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:53,071 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:53,130 [    INFO] [1/53] sub-anm372909/sub-anm372909_ses-20170522.nwb: 17 issues
+2026-11-10 16:11:53,137 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:53,207 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:46,665 [    INFO] [1/53] sub-anm372909/sub-anm372909_ses-20170520.nwb: 16 issues
-2026-11-10 06:45:46,666 [    INFO] [2/53] sub-anm372909/sub-anm372909_ses-20170522.nwb: 17 issues
+2026-11-10 16:11:53,381 [    INFO] [2/53] sub-anm372909/sub-anm372909_ses-20170520.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:47,043 [    INFO] [3/53] sub-anm372905/sub-anm372905_ses-20170715.nwb: 17 issues
-2026-11-10 06:45:47,056 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:53,560 [    INFO] [3/53] sub-anm372905/sub-anm372905_ses-20170715.nwb: 17 issues
+2026-11-10 16:11:53,562 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:47,228 [    INFO] [4/53] sub-anm372905/sub-anm372905_ses-20170716.nwb: 16 issues
+2026-11-10 16:11:53,850 [    INFO] [4/53] sub-anm372905/sub-anm372905_ses-20170716.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:47,400 [    INFO] [5/53] sub-anm372905/sub-anm372905_ses-20170717.nwb: 16 issues
-2026-11-10 06:45:47,414 [ WARNING] Failed to retrieve NWB Inspector version due to HTTPError: 500 Server Error: Internal Server Error for url: https://rig.mit.edu/et/projects/NeurodataWithoutBorders/nwbinspector
+2026-11-10 16:11:54,167 [    INFO] [5/53] sub-anm372905/sub-anm372905_ses-20170717.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:47,457 [    INFO] [6/53] sub-anm372904/sub-anm372904_ses-20170619.nwb: 17 issues
+2026-11-10 16:11:54,280 [    INFO] [6/53] sub-anm372904/sub-anm372904_ses-20170616.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:47,841 [    INFO] [7/53] sub-anm372904/sub-anm372904_ses-20170616.nwb: 16 issues
+2026-11-10 16:11:54,416 [    INFO] [7/53] sub-anm372904/sub-anm372904_ses-20170619.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:48,175 [    INFO] [8/53] sub-anm372904/sub-anm372904_ses-20170617.nwb: 17 issues
+2026-11-10 16:11:54,589 [    INFO] [8/53] sub-anm372904/sub-anm372904_ses-20170617.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:49,184 [    INFO] [9/53] sub-anm372904/sub-anm372904_ses-20170615.nwb: 17 issues
+2026-11-10 16:11:55,858 [    INFO] [9/53] sub-anm372904/sub-anm372904_ses-20170615.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:49,513 [    INFO] [10/53] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
+2026-11-10 16:11:56,231 [    INFO] [10/53] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:49,762 [    INFO] [11/53] sub-anm372904/sub-anm372904_ses-20170618.nwb: 17 issues
+2026-11-10 16:11:56,844 [    INFO] [11/53] sub-anm372904/sub-anm372904_ses-20170618.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:49,784 [    INFO] [12/53] sub-anm369963/sub-anm369963_ses-20170302.nwb: 17 issues
+2026-11-10 16:11:56,854 [    INFO] [12/53] sub-anm369963/sub-anm369963_ses-20170310.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:49,842 [    INFO] [13/53] sub-anm369963/sub-anm369963_ses-20170310.nwb: 17 issues
+2026-11-10 16:11:57,096 [    INFO] [13/53] sub-anm369963/sub-anm369963_ses-20170302.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:50,296 [    INFO] [14/53] sub-anm369963/sub-anm369963_ses-20170306.nwb: 17 issues
+2026-11-10 16:11:57,722 [    INFO] [14/53] sub-anm369963/sub-anm369963_ses-20170306.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:50,611 [    INFO] [15/53] sub-anm369963/sub-anm369963_ses-20170309.nwb: 17 issues
+2026-11-10 16:11:57,732 [    INFO] [15/53] sub-anm369963/sub-anm369963_ses-20170309.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:51,204 [    INFO] [16/53] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-10 16:11:58,080 [    INFO] [16/53] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:51,959 [    INFO] [17/53] sub-anm369963/sub-anm369963_ses-20170301.nwb: 17 issues
+2026-11-10 16:11:59,101 [    INFO] [17/53] sub-anm369963/sub-anm369963_ses-20170301.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:52,353 [    INFO] [18/53] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
+2026-11-10 16:11:59,878 [    INFO] [18/53] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:52,657 [    INFO] [19/53] sub-anm369962/sub-anm369962_ses-20170316.nwb: 17 issues
+2026-11-10 16:12:00,379 [    INFO] [19/53] sub-anm369962/sub-anm369962_ses-20170316.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:52,698 [    INFO] [20/53] sub-anm369962/sub-anm369962_ses-20170313.nwb: 17 issues
+2026-11-10 16:12:00,705 [    INFO] [20/53] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:53,104 [    INFO] [21/53] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
+2026-11-10 16:12:00,720 [    INFO] [21/53] sub-anm369962/sub-anm369962_ses-20170313.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:53,225 [    INFO] [22/53] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
+2026-11-10 16:12:00,959 [    INFO] [22/53] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:53,627 [    INFO] [23/53] sub-anm369962/sub-anm369962_ses-20170314.nwb: 17 issues
+2026-11-10 16:12:01,735 [    INFO] [23/53] sub-anm369962/sub-anm369962_ses-20170314.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:54,055 [    INFO] [24/53] sub-anm369962/sub-anm369962_ses-20170317.nwb: 17 issues
+2026-11-10 16:12:01,791 [    INFO] [24/53] sub-anm369962/sub-anm369962_ses-20170317.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:54,771 [    INFO] [25/53] sub-anm372794/sub-anm372794_ses-20170622.nwb: 17 issues
+2026-11-10 16:12:02,275 [    INFO] [25/53] sub-anm372794/sub-anm372794_ses-20170622.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:55,282 [    INFO] [26/53] sub-anm372794/sub-anm372794_ses-20170624.nwb: 17 issues
+2026-11-10 16:12:03,554 [    INFO] [26/53] sub-anm372794/sub-anm372794_ses-20170624.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:55,553 [    INFO] [27/53] sub-anm372794/sub-anm372794_ses-20170625.nwb: 17 issues
+2026-11-10 16:12:03,789 [    INFO] [27/53] sub-anm372794/sub-anm372794_ses-20170625.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:55,643 [    INFO] [28/53] sub-anm372794/sub-anm372794_ses-20170621.nwb: 17 issues
+2026-11-10 16:12:03,898 [    INFO] [28/53] sub-anm372794/sub-anm372794_ses-20170621.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:55,958 [    INFO] [29/53] sub-anm372794/sub-anm372794_ses-20170626.nwb: 17 issues
+2026-11-10 16:12:04,209 [    INFO] [29/53] sub-anm372794/sub-anm372794_ses-20170627.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:56,021 [    INFO] [30/53] sub-anm372794/sub-anm372794_ses-20170627.nwb: 17 issues
+2026-11-10 16:12:04,600 [    INFO] [30/53] sub-anm372794/sub-anm372794_ses-20170626.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:56,368 [    INFO] [31/53] sub-anm372797/sub-anm372797_ses-20170617.nwb: 17 issues
+2026-11-10 16:12:04,862 [    INFO] [31/53] sub-anm372797/sub-anm372797_ses-20170617.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:57,093 [    INFO] [32/53] sub-anm372797/sub-anm372797_ses-20170615.nwb: 17 issues
+2026-11-10 16:12:05,531 [    INFO] [32/53] sub-anm372795/sub-anm372795_ses-20170714.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:57,539 [    INFO] [33/53] sub-anm372795/sub-anm372795_ses-20170714.nwb: 17 issues
+2026-11-10 16:12:05,720 [    INFO] [33/53] sub-anm372797/sub-anm372797_ses-20170615.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:57,961 [    INFO] [34/53] sub-anm372795/sub-anm372795_ses-20170716.nwb: 17 issues
+2026-11-10 16:12:06,751 [    INFO] [34/53] sub-anm372795/sub-anm372795_ses-20170716.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:58,260 [    INFO] [35/53] sub-anm372795/sub-anm372795_ses-20170715.nwb: 16 issues
+2026-11-10 16:12:07,036 [    INFO] [35/53] sub-anm372795/sub-anm372795_ses-20170715.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:58,539 [    INFO] [36/53] sub-anm372795/sub-anm372795_ses-20170718.nwb: 17 issues
+2026-11-10 16:12:07,130 [    INFO] [36/53] sub-anm372795/sub-anm372795_ses-20170718.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:58,678 [    INFO] [37/53] sub-anm372793/sub-anm372793_ses-20170504.nwb: 17 issues
+2026-11-10 16:12:07,537 [    INFO] [37/53] sub-anm372793/sub-anm372793_ses-20170504.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:59,078 [    INFO] [38/53] sub-anm372793/sub-anm372793_ses-20170508.nwb: 16 issues
+2026-11-10 16:12:07,994 [    INFO] [38/53] sub-anm372793/sub-anm372793_ses-20170508.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:45:59,231 [    INFO] [39/53] sub-anm372793/sub-anm372793_ses-20170514.nwb: 17 issues
+2026-11-10 16:12:08,441 [    INFO] [39/53] sub-anm372793/sub-anm372793_ses-20170514.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:00,106 [    INFO] [40/53] sub-anm372793/sub-anm372793_ses-20170513.nwb: 17 issues
+2026-11-10 16:12:08,892 [    INFO] [40/53] sub-anm372793/sub-anm372793_ses-20170512.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:00,318 [    INFO] [41/53] sub-anm372793/sub-anm372793_ses-20170512.nwb: 17 issues
+2026-11-10 16:12:08,971 [    INFO] [41/53] sub-anm372793/sub-anm372793_ses-20170513.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:00,688 [    INFO] [42/53] sub-anm372907/sub-anm372907_ses-20170608.nwb: 17 issues
+2026-11-10 16:12:09,820 [    INFO] [42/53] sub-anm372907/sub-anm372907_ses-20170608.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:00,969 [    INFO] [43/53] sub-anm372907/sub-anm372907_ses-20170612.nwb: 16 issues
+2026-11-10 16:12:10,438 [    INFO] [43/53] sub-anm372907/sub-anm372907_ses-20170610.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:01,247 [    INFO] [44/53] sub-anm372907/sub-anm372907_ses-20170613.nwb: 17 issues
+2026-11-10 16:12:10,477 [    INFO] [44/53] sub-anm372907/sub-anm372907_ses-20170613.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:01,265 [    INFO] [45/53] sub-anm372907/sub-anm372907_ses-20170610.nwb: 16 issues
+2026-11-10 16:12:10,538 [    INFO] [45/53] sub-anm372907/sub-anm372907_ses-20170612.nwb: 16 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:01,967 [    INFO] [46/53] sub-anm372906/sub-anm372906_ses-20170608.nwb: 17 issues
+2026-11-10 16:12:11,590 [    INFO] [46/53] sub-anm372906/sub-anm372906_ses-20170608.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:02,065 [    INFO] [47/53] sub-anm372906/sub-anm372906_ses-20170610.nwb: 17 issues
+2026-11-10 16:12:11,730 [    INFO] [47/53] sub-anm372906/sub-anm372906_ses-20170610.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:02,756 [    INFO] [48/53] sub-anm372906/sub-anm372906_ses-20170612.nwb: 17 issues
+2026-11-10 16:12:11,978 [    INFO] [48/53] sub-anm372906/sub-anm372906_ses-20170611.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:02,783 [    INFO] [49/53] sub-anm372906/sub-anm372906_ses-20170611.nwb: 17 issues
+2026-11-10 16:12:12,059 [    INFO] [49/53] sub-anm372906/sub-anm372906_ses-20170612.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:02,994 [    INFO] [50/53] sub-anm369964/sub-anm369964_ses-20170321.nwb: 17 issues
+2026-11-10 16:12:12,928 [    INFO] [50/53] sub-anm369964/sub-anm369964_ses-20170321.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:03,356 [    INFO] [51/53] sub-anm369964/sub-anm369964_ses-20170323.nwb: 17 issues
+2026-11-10 16:12:13,585 [    INFO] [51/53] sub-anm369964/sub-anm369964_ses-20170323.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-10 06:46:03,447 [    INFO] [52/53] sub-anm369964/sub-anm369964_ses-20170322.nwb: 17 issues
+2026-11-10 16:12:13,746 [    INFO] [52/53] sub-anm369964/sub-anm369964_ses-20170322.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"<capsule>/intermediate/validation.jsonl
-2026-11-10 06:46:04,942 [    INFO] Logs saved in /home/runner/.local/state/dandi-cli/log/2026.11.10-06.45.31Z-8091.log
+
+--- Validation Summary ---
+Total issues: 946
+By severity:
+  ERROR: 576
+  WARNING: 317
+  INFO: 53
+By validator:
+  nwbinspector: 469
+  pynwb: 424
+  dandi: 53
+By standard:
+  N/A: 469
+  NWB: 424
+  DANDI-LAYOUT: 53
+2026-11-10 16:12:15,269 [    INFO] Logs saved in /home/runner/.local/state/dandi-cli/log/2026.11.10-16.11.37Z-8061.log
 dandi validate exited with 1
 === Writing results ===
-{
-  "dandi_validate_exit_code": 1,
-  "total_results": 946,
-  "by_severity": {
-    "CRITICAL": 0,
-    "ERROR": 576,
-    "WARNING": 317,
-    "HINT": 0,
-    "INFO": 53
-  },
-  "by_validator": {
-    "nwbinspector": 469,
-    "pynwb": 424,
-    "dandi": 53
-  },
-  "by_standard": {
-    "N/A": 469,
-    "NWB": 424,
-    "DANDI-LAYOUT": 53
-  },
-  "by_id": {
-    "NWBI.check_resolution": {
-      "count": 106,
-      "severity": "WARNING"
-    },
-    "NWBI.check_timestamps_ascending": {
-      "count": 105,
-      "severity": "WARNING"
-    },
-    "DANDI.FILE_CONTENT_STREAMED": {
-      "count": 53,
-      "severity": "INFO"
-    },
-    "NWBI.During evaluation of 'check_units_table_duration' - <class 'TypeError'>: Indexing arrays must have integer dtypes": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "NWBI.check_electrodes_location_allen_ccf": {
-      "count": 53,
-      "severity": "WARNING"
-    },
-    "NWBI.check_subject_age": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "NWBI.check_units_resolution_is_set": {
-      "count": 53,
-      "severity": "WARNING"
-    },
-    "pynwb.Units/electrodes_index (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.Units/spike_times_index (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex (units/electrodes_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex (units/spike_times_index): incorrect type - expected 'uint8', got 'int32'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex/description (units/electrodes_index): argument missing": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.VectorIndex/description (units/spike_times_index): argument missing": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.root/general/experimenter (general/experimenter): incorrect shape - expected an array of shape '[None]', got non-array data 'Mike Economo'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "pynwb.root/general/related_publications (general/related_publications): incorrect shape - expected an array of shape '[None]', got non-array data 'doi:10.1038/s41586-018-0642-9'": {
-      "count": 53,
-      "severity": "ERROR"
-    },
-    "NWBI.check_ascending_spike_times": {
-      "count": 46,
-      "severity": "ERROR"
-    }
-  },
-  "files_streamed": 53,
-  "files_missing_content": 0,
-  "files_with_issues": 53
-}
 INFO:    Cleaning up image...
 [INFO] == Command exit (modification check follows) ===== 
 run(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2 (dataset) [apptainer exec --cleanenv envs/dandi-val...]
-add(ok): derivatives/summary.json (file)
 add(ok): derivatives/validation.jsonl (file)
 save(ok): . (dataset)
 action summary:
-  add (ok: 2)
-  get (notneeded: 6)
+  add (ok: 1)
+  get (notneeded: 5)
   run (ok: 1)
   save (ok: 1)
-2026-11-10T06:46:08+0000 [INFO    ] con-duct: Summary:
+2026-11-10T16:12:17+0000 [INFO    ] con-duct: Summary:
 Exit Code: 0
-Command: datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/summarize.py --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'
+Command: datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'
 Log files location: ./logs/duct_
-Wall Clock Time: 45.912 sec
-Memory Peak Usage (RSS): 2.1 GB
-Memory Average Usage (RSS): 1.2 GB
-Virtual Memory Peak Usage (VSZ): 3.3 TB
-Virtual Memory Average Usage (VSZ): 299.9 GB
-Memory Peak Percentage: 11.90%
-Memory Average Percentage: 6.87%
-CPU Peak Usage: 513.10%
-Average CPU Usage: 270.48%
+Wall Clock Time: 48.370 sec
+Memory Peak Usage (RSS): 2.2 GB
+Memory Average Usage (RSS): 1.4 GB
+Virtual Memory Peak Usage (VSZ): 4.4 TB
+Virtual Memory Average Usage (VSZ): 305.0 GB
+Memory Peak Percentage: 11.80%
+Memory Average Percentage: 7.53%
+CPU Peak Usage: 491.80%
+Average CPU Usage: 254.53%
 
