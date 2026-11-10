@@ -4,7 +4,7 @@ Running DANDI validation via DataLad-FUSE streaming adapters and collecting thei
 
 Every Dandiset gets its own repository, `https://github.com/dandi-validations/{dandiset_id}`, whose own GitHub Actions runner validates it with [`dandi validate --missing-file-content=stream`](https://github.com/dandi/dandi-cli/pull/1956).
 Nothing is downloaded: the content-dependent validators (pynwb, nwbinspector) read only what they need, straight from S3.
-Each run is recorded in a **capsule** per image, laid out after [DANDI Compute's job capsules](https://github.com/dandi-compute/001697): a DataLad dataset on its own branch of the Dandiset's repository, which `main` holds as a submodule.
+Each run is recorded in a **capsule** per image and version of this code, laid out after [DANDI Compute's job capsules](https://github.com/dandi-compute/001697): a DataLad dataset on its own branch of the Dandiset's repository, which `main` holds as a submodule.
 
 The validation runs in a `dandi-validation` image that this repository mints on GHCR, tagged by its **validator version code** following the convention of [dandi/dandi-archive#2987](https://github.com/dandi/dandi-archive/pull/2987), e.g.
 `ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2`.
@@ -31,7 +31,7 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
     └── sourcedata/  ← subdataset: https://github.com/dandisets/{dandiset_id} at its draft head
 ```
 
-- **Capsules on tag branches.** Each capsule is a DataLad dataset on the branch named exactly by its image's tag, e.g. `d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2`. The branch holds `code/`, `logs/` and `derivatives/` at its root, the registration of its image (`envs/dandi-validation/image`, annexed, its content on GHCR), and the `[DATALAD RUNCMD]` record of every run, so `datalad rerun` reproduces any of them. Branches are never merged. A capsule holds the latest validation of the Dandiset with its image: a new run (after the Dandiset's files change, or a failure) replaces its contents in a new commit, so the branch's history keeps every earlier run.
+- **Capsules on tag branches.** Each capsule is a DataLad dataset on the branch named by its tag. That is its image's tag, followed by `-v` and the version of dandi-validations that formed it, e.g. `d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0`. The branch holds `code/`, `logs/` and `derivatives/` at its root, the registration of its image (`envs/dandi-validation/image`, annexed, its content on GHCR), and the `[DATALAD RUNCMD]` record of every run, so `datalad rerun` reproduces any of them. Branches are never merged. A new version of dandi-validations starts new branches. A capsule holds the latest validation of the Dandiset with its image and version of this code: a new run (after the Dandiset's files change, or a failure) replaces its contents in a new commit, so the branch's history keeps every earlier run.
 - **Two `dataset_description.json`.** `main`'s describes the repository as a derivative dataset collecting the capsules. The template sync manages it. Each capsule's describes the capsule as a BIDS study dataset: it holds its raw data under `sourcedata/` and its results under `derivatives/`. A job writes it with the provenance of the run:
   - `GeneratedBy` names dandi-cli, the image in BIDS's `Container` (tag and digest), and this code.
   - `SourceDatasets` names the Dandiset and the mirror commit `sourcedata/` pins.
@@ -55,7 +55,7 @@ dandi validate --load 000006/pipeline-dandi+validate_tag-*/derivatives/validatio
 
 On the runner of `https://github.com/dandi-validations/{dandiset_id}` (its **Validate** workflow), `dandi-validations run`, from a checkout of `main`:
 
-1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`). It checks the branch of the pinned image's tag out at the capsule's path as a worktree, or starts it as a new DataLad dataset, and links `sourcedata/` to the mirror's current `draft` head. Unless the capsule's latest run already succeeded on the same inputs, it writes the capsule's `code/`: the assets to validate (`assets.tsv`: path, size, SHA-256, S3 URL), `dandiset.yaml`, the parameters, `run.sh` and `submit.sh`. It also resolves the image's digest on GHCR and writes the capsule's `dataset_description.json` with its provenance. The inputs are the Dandiset version, the image's version code, the parameters and a digest of the assets and `dandiset.yaml`.
+1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`). It checks the capsule's branch (the pinned image's tag and this code's version) out at the capsule's path as a worktree, or starts it as a new DataLad dataset, and links `sourcedata/` to the mirror's current `draft` head. Unless the capsule's latest run already succeeded on the same inputs, it writes the capsule's `code/`: the assets to validate (`assets.tsv`: path, size, SHA-256, S3 URL), `dandiset.yaml`, the parameters, `run.sh` and `submit.sh`. It also resolves the image's digest on GHCR and writes the capsule's `dataset_description.json` with its provenance. The inputs are the Dandiset version, the image's version code, the parameters and a digest of the assets and `dandiset.yaml`.
 2. **Claims it.** It commits the capsule to its branch and pushes the branch, then pins `main`'s submodule to it and pushes `main`. A run that never reports back therefore reads as *stalled*.
 3. **Runs `code/submit.sh`** inside the capsule's dataset. The script:
    - pulls the `dandi-validation` SIF from GHCR
@@ -115,7 +115,7 @@ To update the image:
 
 The **Collect records** workflow runs in [dandi-validations/dandi-validations-records](https://github.com/dandi-validations/dandi-validations-records).
 Every 6 hours, it runs this repository's `dandi-validations collect --tags`, which reads every capsule of every Dandiset repository through `main`'s submodules.
-Each image's records go to the branch of that repository named by the image's tag: `capsules.tsv`, one row per Dandiset, described by `capsules.json`.
+Each capsule tag's records go to the branch of that repository named by the tag: `capsules.tsv`, one row per Dandiset, described by `capsules.json`.
 Its `main` holds only the workflow.
 
 ## Setting up, the command line and development

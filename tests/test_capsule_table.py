@@ -7,6 +7,7 @@ from dandi_validations import (
     CAPSULE_TABLE_COLUMNS,
     Capsule,
     capsule_row,
+    load_pipeline,
     prepare_capsule,
     read_capsule_table,
     write_records,
@@ -49,7 +50,7 @@ def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandise
         "capsule": capsule.name,
         "status": "successful",
         "dandiset_id": "000123",
-        "version": capsule.tag,
+        "version": load_pipeline().container_version,
         "total_results": 5,
         "critical": 0,
         "error": 2,
@@ -85,8 +86,8 @@ def test_write_records(tmp_path: pathlib.Path) -> None:
 
 @pytest.mark.ai_generated
 def test_write_records_by_tag(tmp_path: pathlib.Path) -> None:
-    older = "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
-    newer = "d0.83.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
+    older = "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0"
+    newer = "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0"
     rows = [
         {"dandiset_id": "000006", "capsule": f"pipeline-dandi+validate_tag-{older}", "status": "successful"},
         {"dandiset_id": "000003", "capsule": f"pipeline-dandi+validate_tag-{older}", "status": "failed"},

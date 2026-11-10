@@ -149,6 +149,23 @@ def test_each_image_has_its_own_capsule(
 
 
 @pytest.mark.ai_generated
+def test_each_codebase_version_has_its_own_capsule(
+    git_repository: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+) -> None:
+    pipeline = load_pipeline()
+    newer = dataclasses.replace(pipeline, codebase_version="99.0.0")
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    second = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, pipeline=newer)
+    assert first.path != second.path
+    assert second.tag == f"{pipeline.container_version}-v99.0.0"
+    assert second.path.name == f"pipeline-dandi+validate_tag-{pipeline.container_version}-v99.0.0"
+    assert read_provenance(second.path)["branch"] == second.tag
+    assert read_provenance(second.path)["codebase"] == "v99.0.0"
+
+
+@pytest.mark.ai_generated
 def test_nothing_to_stream(git_repository: pathlib.Path, dandiset_yaml: bytes) -> None:
     result = _prepare(root=git_repository, assets_jsonld=b"[]", dandiset_yaml=dandiset_yaml)
     assert result.capsule is None

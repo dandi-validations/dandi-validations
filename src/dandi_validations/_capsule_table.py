@@ -13,7 +13,7 @@ from ._capsule import SUBMITTED_MARKER_PREFIX, capsule_status, read_provenance
 
 CAPSULE_TABLE_COLUMNS = {
     "dandiset_id": "The six-digit Dandiset that was validated.",
-    "capsule": "The capsule's directory: `pipeline-{pipeline}_tag-{image tag}`.",
+    "capsule": "The capsule's directory: `pipeline-{pipeline}_tag-{image tag}-v{codebase version}`.",
     "status": "Lifecycle status of the capsule's latest run: pending, stalled, failed, successful or unknown.",
     "dandiset_version": "The Dandiset version that was validated (e.g. draft).",
     "pipeline": "The pipeline that formed the capsule.",
