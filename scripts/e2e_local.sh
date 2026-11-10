@@ -58,15 +58,19 @@ if [ -d "${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}" ]; then
     ACTUAL="${WORK_DIRECTORY}/actual"
     rm -rf "$ACTUAL"
     cd "$REPOSITORY_ROOT"
+    status=0
     DANDI_VALIDATIONS_ACTUAL_OUTPUT="$ACTUAL" python -m pytest -m container -v -rs tests/test_expected_output.py \
-        | tee "${WORK_DIRECTORY}/pytest.log"
-    # The test skips without the image, which must not pass for a run.
-    grep -q " 1 passed" "${WORK_DIRECTORY}/pytest.log"
-    for log in duct_stdout duct_stderr duct_usage.jsonl submit.log; do
-        echo "::group::logs/${log}"
-        cat "${ACTUAL}/${CODE}/logs/${log}"
+        | tee "${WORK_DIRECTORY}/pytest.log" || status=$?
+    for log in "${ACTUAL}/${CODE}/logs/"*; do
+        echo "::group::logs/$(basename "$log")"
+        cat "$log"
         echo "::endgroup::"
     done
+    # The test skips without the image, which must not pass for a run.
+    if [ "$status" -ne 0 ] || ! grep -q " 1 passed" "${WORK_DIRECTORY}/pytest.log"; then
+        echo "End-to-end test failed." >&2
+        exit 1
+    fi
     echo "End-to-end test passed."
     exit 0
 fi

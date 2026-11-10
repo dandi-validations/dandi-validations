@@ -283,6 +283,34 @@ def _branch_path(relative: pathlib.Path, /) -> str:
     return pathlib.PurePosixPath(*relative.parts[1:]).as_posix()
 
 
+def _regenerate(*, actual: pathlib.Path, expected: pathlib.Path, claimed: bool) -> None:
+    if not claimed:
+        if expected.exists():
+            shutil.rmtree(expected)
+        shutil.copytree(actual, expected)
+        return
+    for path in actual.rglob("*"):
+        relative = path.relative_to(actual)
+        if path.is_file() and not _branch_path(relative).startswith(CHANGED_BY_RUN):
+            (expected / relative).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, expected / relative)
+
+
+def _difference(*, actual: pathlib.Path, expected: pathlib.Path, relative: pathlib.Path) -> str | None:
+    actual_content = (actual / relative).read_text()
+    expected_content = (expected / relative).read_text()
+    if actual_content == expected_content:
+        return None
+    diff = difflib.unified_diff(
+        expected_content.splitlines(),
+        actual_content.splitlines(),
+        fromfile=f"expected/{relative}",
+        tofile=f"actual/{relative}",
+        lineterm="",
+    )
+    return "\n".join(itertools.islice(diff, 60))
+
+
 def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, claimed: bool = False) -> None:
     """
     Compare a materialized repository with the expected output, file by file.
@@ -294,20 +322,14 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
     Raises
     ------
     AssertionError
-        If a file differs, showing the start of the difference.
+        If the files differ, showing the start of each difference so that it can be read from a
+        CI runner's log.
 
     """
-    actual_files = {path.relative_to(actual) for path in actual.rglob("*") if path.is_file()}
-    if REGENERATE and claimed:
-        for relative in actual_files:
-            if not _branch_path(relative).startswith(CHANGED_BY_RUN):
-                (expected / relative).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(actual / relative, expected / relative)
-    elif REGENERATE:
-        if expected.exists():
-            shutil.rmtree(expected)
-        shutil.copytree(actual, expected)
+    if REGENERATE:
+        _regenerate(actual=actual, expected=expected, claimed=claimed)
 
+    actual_files = {path.relative_to(actual) for path in actual.rglob("*") if path.is_file()}
     expected_files = {path.relative_to(expected) for path in expected.rglob("*") if path.is_file()}
     if claimed:
         expected_files = {path for path in expected_files if not _branch_path(path).startswith(RUN_OUTPUTS)}
@@ -316,23 +338,15 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
         f"Unexpected: {sorted(map(str, actual_files - expected_files))}"
     )
     unchecked = SHOWCASE_LOGS + (CHANGED_BY_RUN if claimed else ())
-    for relative in sorted(expected_files):
-        if _branch_path(relative).startswith(unchecked):
-            continue
-        actual_content = (actual / relative).read_text()
-        expected_content = (expected / relative).read_text()
-        if actual_content != expected_content:
-            # Show where, so that a mismatch on a CI runner can be read from its log.
-            diff = difflib.unified_diff(
-                expected_content.splitlines(),
-                actual_content.splitlines(),
-                fromfile=f"expected/{relative}",
-                tofile=f"actual/{relative}",
-                lineterm="",
-            )
-            shown = "\n".join(itertools.islice(diff, 60))
-            message = f"Content of {relative} differs from {expected / relative}:\n{shown}"
-            raise AssertionError(message)
+    checked = sorted(path for path in expected_files if not _branch_path(path).startswith(unchecked))
+    differences = [
+        difference
+        for relative in checked
+        if (difference := _difference(actual=actual, expected=expected, relative=relative)) is not None
+    ]
+    if differences:
+        message = f"{len(differences)} files differ from {expected}:\n" + "\n".join(differences)
+        raise AssertionError(message)
 
 
 def _materialize_branches(*, world: World, names: dict[str, str], destination: pathlib.Path) -> None:
