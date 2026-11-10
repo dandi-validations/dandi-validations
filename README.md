@@ -2,7 +2,7 @@
 
 Running DANDI validation via DataLad-FUSE streaming adapters and collecting their records across this organization's repositories.
 
-Every Dandiset gets its own repository, `dandi-validations/{dandiset_id}`, whose own GitHub Actions
+Every Dandiset gets its own repository, `https://github.com/dandi-validations/{dandiset_id}`, whose own GitHub Actions
 runner validates it with
 [`dandi validate --missing-file-content=stream`](https://github.com/dandi/dandi-cli/pull/1956).
 Nothing is downloaded: the content-dependent validators (pynwb, nwbinspector) read only what they
@@ -19,7 +19,7 @@ repositories, and the records collected from them (`records/`).
 
 ## How a job runs
 
-On the runner of `dandi-validations/{dandiset_id}` (its **Validate** workflow), `dandi-validations run`:
+On the runner of `https://github.com/dandi-validations/{dandiset_id}` (its **Validate** workflow), `dandi-validations run`:
 
 1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket
    (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`) and writes the capsule's `code/`:
@@ -64,7 +64,7 @@ Each Dandiset repository is a standalone
 BIDS derivative dataset of its Dandiset:
 
 ```
-dandi-validations/{dandiset_id}/
+https://github.com/dandi-validations/{dandiset_id}/
 ├── dataset_description.json  ← the derivative dataset (DatasetType "derivative")
 └── pipeline-dandi+validate/
     ├── jobs.tsv, jobs.json  ← one row per capsule, rebuilt after each job
@@ -134,7 +134,7 @@ To update the image:
 | Workflow | What it does |
 | --- | --- |
 | **Build and publish container** | Builds the image for the version code of `pixi.lock` and pushes the OCI image, its SIF and its lock to GHCR, unless that code is already published. |
-| **Make repositories** | Creates `dandi-validations/{id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into all of them; optionally dispatches their validation. |
+| **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into all of them; optionally dispatches their validation. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
 | **Collect records** | Every 6 hours, gathers each repository's `jobs.tsv` into `records/jobs.tsv` and `records/latest.tsv`. |
 | **Tests** | Unit tests, and one real job end to end (Dandiset 000006) against a local bare repository. |
