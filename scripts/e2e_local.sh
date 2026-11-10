@@ -27,7 +27,7 @@ IMAGE="$(read_pin container.image)"
 CODE="$(read_pin container.version)"
 NAME="$(read_pin container.name)"
 
-LOCKED_CODE="$(dandi-validations version-code --pixi-lock "${CONTAINER_DIRECTORY}/pixi.lock")"
+LOCKED_CODE="$(dandi-validations version-code --lock "${CONTAINER_DIRECTORY}/pixi.lock")"
 if [ "$LOCKED_CODE" != "$CODE" ]; then
     echo "pixi.lock makes version code ${LOCKED_CODE}, but pipeline.json pins ${CODE}." >&2
     exit 1
@@ -55,7 +55,7 @@ mkdir -p "$(dirname "$REMOTE")" "${WORK_DIRECTORY}/sync"
 git init --quiet --bare -b main "$REMOTE"
 python - "$DANDISET_ID" "$REMOTE" "${WORK_DIRECTORY}/sync" <<'EOF'
 import pathlib, sys
-from dandi_validations._repositories import sync_repository
+from dandi_validations import sync_repository
 
 dandiset_id, remote, work = sys.argv[1:]
 sync_repository(dandiset_id=dandiset_id, remote_url=f"file://{remote}", codebase_ref="main", work_directory=pathlib.Path(work))
@@ -67,17 +67,16 @@ git clone --quiet "$REMOTE" "$CLONE"
 MANIFEST_ARGUMENTS=()
 GOLDEN_MANIFEST="${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}"
 if [ -d "$GOLDEN_MANIFEST" ]; then
-    MANIFEST_ARGUMENTS=(--manifest-directory "$GOLDEN_MANIFEST")
+    MANIFEST_ARGUMENTS=(--manifest "$GOLDEN_MANIFEST")
 fi
 
 cd "$CLONE"
-dandi-validations run --dandiset-id "$DANDISET_ID" --push origin --time-limit-minutes 60 "${MANIFEST_ARGUMENTS[@]}"
+dandi-validations run --dandiset "$DANDISET_ID" --push origin --timeout 60 "${MANIFEST_ARGUMENTS[@]}"
 
 python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" "$GOLDEN_MANIFEST" "$WORK_DIRECTORY" <<'EOF'
 import json, pathlib, subprocess, sys
 
-from dandi_validations._capsule import read_provenance
-from dandi_validations._capsule_table import capsule_row
+from dandi_validations import capsule_row, read_provenance
 
 image, code, digest, remote, golden_manifest, work = sys.argv[1:]
 
@@ -119,7 +118,7 @@ if pathlib.Path(golden_manifest).is_dir():
     sys.path.insert(0, str(pathlib.Path(golden_manifest).parents[1]))
     import golden
 
-    golden.check_validated(pathlib.Path(remote), code, pathlib.Path(work))
+    golden.check_validated(repository=pathlib.Path(remote), tag=code, work=pathlib.Path(work))
 else:
     print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
 EOF
@@ -128,5 +127,5 @@ git -C "$REMOTE" log --oneline main | head -n 5
 git -C "$REMOTE" log --oneline "$CODE" | head -n 5
 
 # A second run finds the successful capsule and does nothing.
-dandi-validations run --dandiset-id "$DANDISET_ID" --push origin "${MANIFEST_ARGUMENTS[@]}" | grep -q "already validated"
+dandi-validations run --dandiset "$DANDISET_ID" --push origin "${MANIFEST_ARGUMENTS[@]}" 2>&1 | grep -q "already validated"
 echo "End-to-end test passed."

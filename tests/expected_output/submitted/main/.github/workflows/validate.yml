@@ -50,9 +50,9 @@ jobs:
           FORCE: ${{ inputs.force && '--force' || '' }}
         run: |
           dandi-validations run \
-            --dandiset-id 000006 \
-            --dandiset-version "$DANDISET_VERSION" \
+            --dandiset 000006 \
+            --version "$DANDISET_VERSION" \
             --push origin \
             --branch main \
-            --time-limit-minutes 330 \
+            --timeout 330 \
             $FORCE

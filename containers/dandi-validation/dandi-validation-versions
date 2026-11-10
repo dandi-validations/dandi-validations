@@ -36,7 +36,7 @@ versions = {
     "all_distributions": dict(
         sorted(
             (distribution.metadata["Name"], distribution.version) for distribution in importlib.metadata.distributions()
-        )
+        ),
     ),
 }
 print(json.dumps(versions, indent=2))

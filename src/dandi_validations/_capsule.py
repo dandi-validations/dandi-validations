@@ -1,32 +1,27 @@
 """
-Capsules: one per image tag in each Dandiset repository.
+Form the capsules of a Dandiset repository, one per image tag.
 
 Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its Dandiset. Its
 ``main`` branch holds its ``dataset_description.json`` and one submodule per capsule::
 
     https://github.com/dandi-validations/{dandiset_id}/   (main)
     ├── dataset_description.json  ← the derivative dataset that collects the capsules
-    └── pipeline-dandi+validate_tag-{tag}/  ← submodule: this repository's branch {tag}
-        ├── dataset_description.json  ← a study dataset: the provenance of its latest run
+    └── pipeline-dandi+validate_tag-{tag}/  ← submodule, this repository's branch {tag}
+        ├── dataset_description.json  ← a study dataset with the provenance of its latest run
         ├── code/  ← the exact code and inputs of its latest run
         ├── logs/  ← all runtime records of that run, for success or failure
         ├── derivatives/  ← the validation results (only for a completed run)
         ├── envs/  ← the image's registration
-        └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset (see ``_branches``)
+        └── sourcedata/  ← subdataset linking DANDI's DataLad mirror of the Dandiset
 
-``{tag}`` is the dandi-validation image's tag: its validator version code. Each capsule is a
-DataLad dataset on the branch named by that tag (see ``_branches``). It holds the latest
-validation of the Dandiset with that image; a new run with the same image (after the Dandiset's
-files change, or a failure) replaces its contents in a new commit on the branch, so earlier runs
-remain in the branch's history, each with its ``datalad run`` record.
+``{tag}`` is the dandi-validation image's tag, which is its validator version code. Each capsule
+is a DataLad dataset on the branch named by that tag. It holds the latest validation of the
+Dandiset with that image. A new run with the same image replaces its contents in a new commit on
+the branch, so earlier runs remain in the branch's history, each with its ``datalad run`` record.
 
-A capsule's ``dataset_description.json`` (``DatasetType`` "study") names its image in
-``GeneratedBy`` (``Container``, with tag and digest), the Dandiset and the pinned mirror commit in
-``SourceDatasets``, and the inputs of its latest run under ``DandiValidations``.
-
-A capsule's lifecycle status is read from what it contains, as DANDI Compute does: ``pending``
-(code only), ``stalled`` (submitted but nothing logged), ``failed`` (logs without results) and
-``successful`` (results under ``derivatives/``).
+A capsule's lifecycle status is read from what it contains, as DANDI Compute does. It is
+``pending`` with code only, ``stalled`` when submitted but nothing was logged, ``failed`` with logs
+but no results, and ``successful`` with results under ``derivatives/``.
 """
 
 import dataclasses
@@ -40,13 +35,7 @@ import shutil
 import socket
 import subprocess
 
-from ._globals import (
-    CODEBASE_URL,
-    DANDI_ARCHIVE_URL,
-    DEFAULT_PARAMS_KEY,
-    ORGANIZATION,
-    PROVENANCE_KEY,
-)
+from ._globals import CODEBASE_URL, DANDI_ARCHIVE_URL, DEFAULT_PARAMS_KEY, ORGANIZATION, PROVENANCE_KEY
 from ._manifest import (
     assets_table_bytes,
     fetch_assets_jsonld,
@@ -55,32 +44,66 @@ from ._manifest import (
     select_assets,
     skipped_table_bytes,
     source_digest,
-    write_table,
 )
-from ._pipeline import CAPSULE_CODE_DIRECTORY, TEMPLATES_DIRECTORY, Parameters, Pipeline, load_parameters, load_pipeline
+from ._pipeline import (
+    CAPSULE_CODE_DIRECTORY,
+    TEMPLATES_DIRECTORY,
+    ParameterSet,
+    Pipeline,
+    load_parameters,
+    load_pipeline,
+)
 from ._registry import resolve_digest
-from ._templates import render
+from ._templates import render_template
 from ._version_code import parse_version_code
 
-#: What a capsule's run writes, which a new run replaces.
 CAPSULE_CONTENTS = ("code", "logs", "derivatives", "intermediate")
-
 SUBMITTED_MARKER_PREFIX = "submitted_date-"
-JOB_STATUSES = ("pending", "stalled", "failed", "successful", "unknown")
 DATASET_DESCRIPTION = "dataset_description.json"
 CAPSULE_NAME_RE = re.compile(r"pipeline-(?P<pipeline>[A-Za-z0-9+]+)_tag-(?P<tag>[A-Za-z0-9_.+-]+)")
 
-#: Provenance fields that identify what a capsule's run validated: a successful capsule whose
-#: fields all match is not run again.
+# A successful capsule whose latest run matches all of these is not run again.
 _INPUT_FIELDS = ("dandiset_version", "version", "params", "source_digest")
 
 
-def capsule_name(pipeline: str, tag: str) -> str:
+def capsule_name(*, pipeline: str, tag: str) -> str:
+    """
+    Name the directory of a capsule.
+
+    Parameters
+    ----------
+    pipeline : str
+        The pipeline's name.
+    tag : str
+        The image's tag.
+
+    Returns
+    -------
+    str
+        The name, ``pipeline-{pipeline}_tag-{tag}``.
+
+    """
     return f"pipeline-{pipeline}_tag-{tag}"
 
 
 @dataclasses.dataclass(frozen=True)
 class Capsule:
+    """
+    Locate a capsule in a clone of a Dandiset repository.
+
+    Attributes
+    ----------
+    repository_root : pathlib.Path
+        The root of the clone of the repository's main.
+    dandiset_id : str
+        The six-digit identifier of the Dandiset.
+    pipeline : str
+        The pipeline's name.
+    tag : str
+        The image's tag, which is also the name of the capsule's branch.
+
+    """
+
     repository_root: pathlib.Path
     dandiset_id: str
     pipeline: str
@@ -88,42 +111,120 @@ class Capsule:
 
     @property
     def name(self) -> str:
-        return capsule_name(self.pipeline, self.tag)
+        """
+        Name the capsule's directory, which is also the path of its submodule in main.
 
-    @property
-    def relative_path(self) -> pathlib.PurePosixPath:
-        return pathlib.PurePosixPath(self.name)
+        Returns
+        -------
+        str
+            The name.
+
+        """
+        return capsule_name(pipeline=self.pipeline, tag=self.tag)
 
     @property
     def path(self) -> pathlib.Path:
-        return self.repository_root / self.relative_path
+        """
+        Locate the capsule's worktree.
+
+        Returns
+        -------
+        pathlib.Path
+            The capsule's directory in the clone.
+
+        """
+        return self.repository_root / self.name
 
     @property
     def code_directory(self) -> pathlib.Path:
+        """
+        Locate the capsule's ``code/`` directory.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory.
+
+        """
         return self.path / "code"
 
     @property
     def logs_directory(self) -> pathlib.Path:
+        """
+        Locate the capsule's ``logs/`` directory.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory.
+
+        """
         return self.path / "logs"
 
     @property
     def derivatives_directory(self) -> pathlib.Path:
+        """
+        Locate the capsule's ``derivatives/`` directory.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory.
+
+        """
         return self.path / "derivatives"
 
     @property
     def submit_script_path(self) -> pathlib.Path:
+        """
+        Locate the capsule's ``submit.sh``.
+
+        Returns
+        -------
+        pathlib.Path
+            The script.
+
+        """
         return self.code_directory / "submit.sh"
 
 
-def list_capsules(repository_root: pathlib.Path) -> list[pathlib.Path]:
+def list_capsules(repository_root: pathlib.Path, /) -> list[pathlib.Path]:
+    """
+    List the capsule directories of a clone.
+
+    Parameters
+    ----------
+    repository_root : pathlib.Path
+        The root of the clone.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        The capsule directories, sorted.
+
+    """
     return sorted(path for path in repository_root.iterdir() if path.is_dir() and CAPSULE_NAME_RE.fullmatch(path.name))
 
 
-def _has_files(directory: pathlib.Path) -> bool:
+def _has_files(directory: pathlib.Path, /) -> bool:
     return directory.is_dir() and any(path.is_file() or path.is_symlink() for path in directory.rglob("*"))
 
 
-def capsule_status(capsule_directory: pathlib.Path) -> str:
+def capsule_status(capsule_directory: pathlib.Path, /) -> str:
+    """
+    Read a capsule's lifecycle status from what it contains.
+
+    Parameters
+    ----------
+    capsule_directory : pathlib.Path
+        The capsule's directory.
+
+    Returns
+    -------
+    str
+        One of ``pending``, ``stalled``, ``failed``, ``successful`` or ``unknown``.
+
+    """
     code_directory = capsule_directory / "code"
     if _has_files(capsule_directory / "derivatives"):
         return "successful"
@@ -155,8 +256,7 @@ def _codebase_version() -> str:
     return f"v{version}+{commit}"
 
 
-def claim_identifier() -> str:
-    """Who claimed (submitted) a capsule: the GitHub Actions run attempt, or this host and process."""
+def _claim_identifier() -> str:
     if os.environ.get("GITHUB_RUN_ID"):
         server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
         repository = os.environ.get("GITHUB_REPOSITORY", "")
@@ -166,25 +266,64 @@ def claim_identifier() -> str:
     return f"local:{socket.gethostname()}:{os.getpid()}"
 
 
-# --------------------------------------------------------------------------------------------- #
-# The capsule's dataset_description.json
-# --------------------------------------------------------------------------------------------- #
-def read_dataset_description(directory: pathlib.Path) -> dict:
+def read_dataset_description(directory: pathlib.Path, /) -> dict:
+    """
+    Read the ``dataset_description.json`` of a dataset.
+
+    Parameters
+    ----------
+    directory : pathlib.Path
+        The dataset's directory.
+
+    Returns
+    -------
+    dict
+        Its content, or an empty dictionary when it has none.
+
+    """
     file_path = directory / DATASET_DESCRIPTION
     return json.loads(file_path.read_text()) if file_path.exists() else {}
 
 
-def read_provenance(capsule_directory: pathlib.Path) -> dict:
-    """The provenance of a capsule's latest run, from its own dataset_description.json."""
+def read_provenance(capsule_directory: pathlib.Path, /) -> dict:
+    """
+    Read the provenance of a capsule's latest run from its ``dataset_description.json``.
+
+    Parameters
+    ----------
+    capsule_directory : pathlib.Path
+        The capsule's directory.
+
+    Returns
+    -------
+    dict
+        The provenance, or an empty dictionary when the capsule has none.
+
+    """
     return read_dataset_description(capsule_directory).get(PROVENANCE_KEY, {})
 
 
-def capsule_dataset_description(capsule: "Capsule", pipeline: Pipeline, provenance: dict) -> dict:
+def capsule_dataset_description(*, capsule: Capsule, pipeline: Pipeline, provenance: dict) -> dict:
     """
-    The capsule's dataset_description.json: a BIDS study dataset of its latest run.
+    Describe a capsule as a BIDS study dataset of its latest run.
 
-    A study dataset holds the raw data it was derived from under ``sourcedata/`` (here, DANDI's
-    DataLad mirror of the Dandiset) and the results under ``derivatives/``.
+    A study dataset holds the raw data it was derived from under ``sourcedata/`` and the results
+    under ``derivatives/``. Here the raw data is DANDI's DataLad mirror of the Dandiset.
+
+    Parameters
+    ----------
+    capsule : Capsule
+        The capsule.
+    pipeline : Pipeline
+        The pipeline of its latest run.
+    provenance : dict
+        The provenance of its latest run.
+
+    Returns
+    -------
+    dict
+        The content of the capsule's ``dataset_description.json``.
+
     """
     digest = provenance["image_digest"]
     sourcedata = provenance.get("sourcedata")
@@ -192,7 +331,7 @@ def capsule_dataset_description(capsule: "Capsule", pipeline: Pipeline, provenan
         {
             "URL": f"{DANDI_ARCHIVE_URL}/dandiset/{capsule.dandiset_id}/{provenance['dandiset_version']}",
             "Version": provenance["dandiset_version"],
-        }
+        },
     ]
     if sourcedata is not None:
         source_datasets.append({"URL": sourcedata["url"], "Version": sourcedata["commit"]})
@@ -236,16 +375,37 @@ def capsule_dataset_description(capsule: "Capsule", pipeline: Pipeline, provenan
     }
 
 
-# --------------------------------------------------------------------------------------------- #
-# Forming a capsule
-# --------------------------------------------------------------------------------------------- #
 @dataclasses.dataclass(frozen=True)
 class CapsulePlan:
-    """What a capsule's next run validates, before anything is written."""
+    """
+    Describe what a capsule's next run validates, before anything is written.
+
+    Attributes
+    ----------
+    capsule : Capsule
+        The capsule.
+    pipeline : Pipeline
+        The pipeline to run.
+    parameters : ParameterSet
+        The parameter set to run with.
+    inputs : dict
+        The inputs that identify the run.
+    dandiset_yaml : bytes
+        The Dandiset's metadata.
+    assets_table : bytes
+        The TSV of the assets to register.
+    skipped_table : bytes or None
+        The TSV of the skipped assets, if any.
+    number_of_assets : int
+        How many assets are registered.
+    number_of_skipped_assets : int
+        How many assets are skipped.
+
+    """
 
     capsule: Capsule
     pipeline: Pipeline
-    parameters: Parameters
+    parameters: ParameterSet
     inputs: dict
     dandiset_yaml: bytes
     assets_table: bytes
@@ -256,11 +416,23 @@ class CapsulePlan:
 
 @dataclasses.dataclass(frozen=True)
 class PrepareResult:
+    """
+    Report what preparing a capsule did.
+
+    Attributes
+    ----------
+    capsule : Capsule or None
+        The capsule that was written, if any.
+    reason : str
+        What was done, or why nothing was.
+
+    """
+
     capsule: Capsule | None
     reason: str
 
 
-def plan_capsule(
+def plan_capsule(  # noqa: PLR0913
     *,
     repository_root: pathlib.Path,
     dandiset_id: str,
@@ -271,18 +443,40 @@ def plan_capsule(
     dandiset_yaml: bytes | None = None,
 ) -> CapsulePlan | str:
     """
-    Read the Dandiset's manifest and work out the capsule of the pinned image.
+    Read a Dandiset's manifest and work out the capsule of the pinned image.
 
-    Returns the plan, or the reason there is nothing to validate. The inputs that identify a run
-    are the Dandiset version, the image's version code, the parameter set and the digest of the
-    Dandiset's registered assets and metadata.
+    The inputs that identify a run are the Dandiset version, the image's version code, the
+    parameter set, and the digest of the Dandiset's registered assets and metadata.
+
+    Parameters
+    ----------
+    repository_root : pathlib.Path
+        The root of the clone of the repository's main.
+    dandiset_id : str
+        The six-digit identifier of the Dandiset.
+    dandiset_version : str, default="draft"
+        The Dandiset version.
+    params_key : str, default="default"
+        The registered parameter set.
+    pipeline : Pipeline or None, default=None
+        The pipeline, if not the pinned one.
+    assets_jsonld : bytes or None, default=None
+        The manifest, if not the archive's current one.
+    dandiset_yaml : bytes or None, default=None
+        The metadata, if not the archive's current one.
+
+    Returns
+    -------
+    CapsulePlan or str
+        The plan, or the reason there is nothing to validate.
+
     """
     pipeline = pipeline if pipeline is not None else load_pipeline()
     parameters = load_parameters(params_key)
     if assets_jsonld is None:
-        assets_jsonld = fetch_assets_jsonld(dandiset_id, dandiset_version)
+        assets_jsonld = fetch_assets_jsonld(dandiset_id=dandiset_id, version=dandiset_version)
     if dandiset_yaml is None:
-        dandiset_yaml = fetch_dandiset_yaml(dandiset_id, dandiset_version)
+        dandiset_yaml = fetch_dandiset_yaml(dandiset_id=dandiset_id, version=dandiset_version)
 
     rows, skipped = select_assets(parse_assets_jsonld(assets_jsonld))
     if not rows:
@@ -299,7 +493,10 @@ def plan_capsule(
         "source_digest": source_digest(assets_table=assets_table, dandiset_yaml=dandiset_yaml),
     }
     capsule = Capsule(
-        repository_root=repository_root, dandiset_id=dandiset_id, pipeline=pipeline.pipeline, tag=inputs["version"]
+        repository_root=repository_root,
+        dandiset_id=dandiset_id,
+        pipeline=pipeline.pipeline,
+        tag=inputs["version"],
     )
     return CapsulePlan(
         capsule=capsule,
@@ -314,32 +511,60 @@ def plan_capsule(
     )
 
 
-def is_up_to_date(plan: CapsulePlan) -> bool:
-    """Whether the capsule's latest run succeeded on exactly these inputs."""
+def is_up_to_date(plan: CapsulePlan, /) -> bool:
+    """
+    Check whether a capsule's latest run succeeded on exactly the planned inputs.
+
+    Parameters
+    ----------
+    plan : CapsulePlan
+        The plan of the capsule's next run.
+
+    Returns
+    -------
+    bool
+        Whether the run can be skipped.
+
+    """
     previous = read_provenance(plan.capsule.path)
     return capsule_status(plan.capsule.path) == "successful" and all(
         previous.get(field) == plan.inputs[field] for field in _INPUT_FIELDS
     )
 
 
-def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None, sourcedata: dict | None = None) -> None:
+def write_capsule(
+    *,
+    plan: CapsulePlan,
+    now: datetime.datetime | None = None,
+    sourcedata: dict | None = None,
+) -> None:
     """
-    Replace the capsule's code (and results) with the next run's, and record its provenance.
+    Replace a capsule's code and results with the next run's, and record its provenance.
 
-    Only what a run writes is replaced: the capsule's dataset, image registration and history stay.
-    ``sourcedata`` is the link to DANDI's DataLad mirror of the Dandiset (see ``_branches``).
+    Only what a run writes is replaced. The capsule's dataset, image registration and history stay.
+
+    Parameters
+    ----------
+    plan : CapsulePlan
+        The plan of the run.
+    now : datetime.datetime or None, default=None
+        When the run is formed, if not now.
+    sourcedata : dict or None, default=None
+        The link to DANDI's DataLad mirror of the Dandiset, if any.
+
     """
-    now = now if now is not None else datetime.datetime.now(tz=datetime.timezone.utc)
+    now = now if now is not None else datetime.datetime.now(tz=datetime.UTC)
     capsule, pipeline = plan.capsule, plan.pipeline
     for name in CAPSULE_CONTENTS:
         target = capsule.path / name
         if target.exists():
+            # git-annex leaves directories read-only.
             for path in target.rglob("*"):
                 if path.is_dir():
                     path.chmod(0o755)
             shutil.rmtree(target)
 
-    image_digest = resolve_digest(pipeline.container_image, pipeline.container_version)
+    image_digest = resolve_digest(image=pipeline.container_image, tag=pipeline.container_version)
     assets_file_name = _write_code(
         capsule=capsule,
         pipeline=pipeline,
@@ -351,16 +576,15 @@ def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None, so
         skipped_table=plan.skipped_table,
         now=now,
     )
+    codebase_version = _codebase_version()
     provenance = {
         "dandiset_id": capsule.dandiset_id,
         **plan.inputs,
-        # The six validator versions of the image (the shape of the archive's
-        # `validatedRequiredVersions`, dandi/dandi-archive#2987).
+        # The shape of the archive's `validatedRequiredVersions` (dandi/dandi-archive#2987).
         "validator_versions": parse_version_code(pipeline.container_version),
         "image": pipeline.image_reference,
         "image_digest": image_digest,
         "branch": capsule.tag,
-        # DANDI's DataLad mirror of the Dandiset at this run, linked as sourcedata/ (not validated).
         "sourcedata": sourcedata,
         "pipeline": pipeline.pipeline,
         "params_key": plan.parameters.key,
@@ -372,15 +596,15 @@ def write_capsule(plan: CapsulePlan, *, now: datetime.datetime | None = None, so
             "code_url": pipeline.dandi_cli_code_url,
             "reference": pipeline.dandi_cli_reference or pipeline.dandi_cli_repository,
         },
-        "codebase": _codebase_version().split("+")[0],
-        "codebase_version": _codebase_version(),
+        "codebase": codebase_version.split("+")[0],
+        "codebase_version": codebase_version,
         "created_at": now.replace(microsecond=0).isoformat(),
     }
-    description = capsule_dataset_description(capsule, pipeline, provenance)
+    description = capsule_dataset_description(capsule=capsule, pipeline=pipeline, provenance=provenance)
     (capsule.path / DATASET_DESCRIPTION).write_text(json.dumps(description, indent=2) + "\n")
 
 
-def prepare_capsule(
+def prepare_capsule(  # noqa: PLR0913
     *,
     repository_root: pathlib.Path,
     dandiset_id: str,
@@ -392,7 +616,38 @@ def prepare_capsule(
     assets_jsonld: bytes | None = None,
     dandiset_yaml: bytes | None = None,
 ) -> PrepareResult:
-    """Plan the capsule and write it, unless it already validated these inputs (no git involved)."""
+    """
+    Plan a capsule and write it, unless it already validated these inputs.
+
+    No git is involved.
+
+    Parameters
+    ----------
+    repository_root : pathlib.Path
+        The root of the clone of the repository's main.
+    dandiset_id : str
+        The six-digit identifier of the Dandiset.
+    dandiset_version : str, default="draft"
+        The Dandiset version.
+    params_key : str, default="default"
+        The registered parameter set.
+    force : bool, default=False
+        Whether to write the capsule even if it already validated these inputs.
+    now : datetime.datetime or None, default=None
+        When the run is formed, if not now.
+    pipeline : Pipeline or None, default=None
+        The pipeline, if not the pinned one.
+    assets_jsonld : bytes or None, default=None
+        The manifest, if not the archive's current one.
+    dandiset_yaml : bytes or None, default=None
+        The metadata, if not the archive's current one.
+
+    Returns
+    -------
+    PrepareResult
+        The capsule that was written, if any, and what was done.
+
+    """
     plan = plan_capsule(
         repository_root=repository_root,
         dandiset_id=dandiset_id,
@@ -407,16 +662,16 @@ def prepare_capsule(
     if not force and is_up_to_date(plan):
         reason = f"{plan.capsule.name} already validated these inputs; nothing to do (use --force to validate again)."
         return PrepareResult(capsule=None, reason=reason)
-    write_capsule(plan, now=now)
+    write_capsule(plan=plan, now=now)
     return PrepareResult(capsule=plan.capsule, reason=f"Formed {plan.capsule.name} for {plan.number_of_assets} assets.")
 
 
-def _write_code(
+def _write_code(  # noqa: PLR0913
     *,
     capsule: Capsule,
     pipeline: Pipeline,
     image_digest: str | None,
-    parameters: Parameters,
+    parameters: ParameterSet,
     dandiset_version: str,
     dandiset_yaml: bytes,
     assets_table: bytes,
@@ -426,17 +681,18 @@ def _write_code(
     code_directory = capsule.code_directory
     code_directory.mkdir(parents=True)
 
-    assets_file_path = write_table(assets_table, code_directory / "assets.tsv")
+    assets_file_path = code_directory / "assets.tsv"
+    assets_file_path.write_bytes(assets_table)
     if skipped_table is not None:
-        write_table(skipped_table, code_directory / "skipped_assets.tsv")
+        (code_directory / "skipped_assets.tsv").write_bytes(skipped_table)
     (code_directory / "dandiset.yaml").write_bytes(dandiset_yaml)
     params_file_path = code_directory / parameters.file_path.name
     shutil.copyfile(parameters.file_path, params_file_path)
     for name in ("run.sh", "summarize.py"):
         shutil.copyfile(CAPSULE_CODE_DIRECTORY / name, code_directory / name)
 
-    submit_script = render(
-        (TEMPLATES_DIRECTORY / "submit.sh").read_text(),
+    submit_script = render_template(
+        template=(TEMPLATES_DIRECTORY / "submit.sh").read_text(),
         capsule_name=capsule.name,
         branch=capsule.tag,
         dandiset_id=capsule.dandiset_id,
@@ -456,5 +712,5 @@ def _write_code(
         (code_directory / name).chmod(0o755)
 
     marker_name = f"{SUBMITTED_MARKER_PREFIX}{now:%Y+%m+%d}_time-{now:%H+%M+%S}"
-    (code_directory / marker_name).write_text(claim_identifier() + "\n")
+    (code_directory / marker_name).write_text(_claim_identifier() + "\n")
     return assets_file_path.name

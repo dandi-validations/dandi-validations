@@ -1,4 +1,4 @@
-"""Thin wrappers around git, git-annex and DataLad for committing and publishing job capsules."""
+"""Run git, git-annex and DataLad for committing and publishing job capsules."""
 
 import logging
 import pathlib
@@ -8,9 +8,32 @@ import time
 _log = logging.getLogger(__name__)
 
 
-def run(command: list[str], *, cwd: pathlib.Path, check: bool = True) -> subprocess.CompletedProcess:
+def run(*, command: list[str], cwd: pathlib.Path, check: bool = True) -> subprocess.CompletedProcess:
+    """
+    Run a command and capture its output.
+
+    Parameters
+    ----------
+    command : list[str]
+        The command and its arguments.
+    cwd : pathlib.Path
+        The directory to run it in.
+    check : bool, default=True
+        Whether to raise when the command fails.
+
+    Returns
+    -------
+    subprocess.CompletedProcess
+        The finished command, with its output as text.
+
+    Raises
+    ------
+    RuntimeError
+        If ``check`` is set and the command exits with a non-zero code.
+
+    """
     _log.debug("Running %s in %s", command, cwd)
-    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True)
+    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
     if check and result.returncode != 0:
         message = (
             f"Command {command} failed in {cwd} with exit code {result.returncode}.\n"
@@ -20,54 +43,85 @@ def run(command: list[str], *, cwd: pathlib.Path, check: bool = True) -> subproc
     return result
 
 
-def repository_root(path: pathlib.Path) -> pathlib.Path:
-    return pathlib.Path(run(["git", "rev-parse", "--show-toplevel"], cwd=path).stdout.strip())
+def repository_root(path: pathlib.Path, /) -> pathlib.Path:
+    """
+    Find the root of the git repository that contains a path.
 
+    Parameters
+    ----------
+    path : pathlib.Path
+        A path inside the repository.
 
-def current_branch(root: pathlib.Path) -> str:
-    return run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root).stdout.strip()
+    Returns
+    -------
+    pathlib.Path
+        The repository's top-level directory.
 
-
-def has_ref(root: pathlib.Path, ref: str) -> bool:
-    return run(["git", "rev-parse", "--verify", "--quiet", ref], cwd=root, check=False).returncode == 0
+    """
+    return pathlib.Path(run(command=["git", "rev-parse", "--show-toplevel"], cwd=path).stdout.strip())
 
 
 def ensure_annex(
-    root: pathlib.Path, *, remote: str | None = "origin", description: str = "ephemeral job runner"
+    *,
+    root: pathlib.Path,
+    remote: str | None = "origin",
+    description: str = "ephemeral job runner",
 ) -> None:
     """
-    Initialize git-annex in this clone as a private repository, unless it already is initialized.
+    Initialize git-annex in a clone as a private repository, unless it is already initialized.
 
-    Runners are ephemeral: with ``annex.private`` nothing about this clone is written to the
+    Runners are ephemeral. With ``annex.private`` nothing about the clone is written to the
     git-annex branch, so its UUID never appears as a location of any content.
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        The root of the clone.
+    remote : str or None, default="origin"
+        A remote whose git-annex branch to fetch first, if it has one.
+    description : str, default="ephemeral job runner"
+        The description of this git-annex repository.
+
     """
-    if run(["git", "config", "--get", "annex.uuid"], cwd=root, check=False).returncode == 0:
+    if run(command=["git", "config", "--get", "annex.uuid"], cwd=root, check=False).returncode == 0:
         return
-    if remote is not None and run(["git", "remote", "get-url", remote], cwd=root, check=False).returncode == 0:
-        run(["git", "fetch", remote, f"+refs/heads/git-annex:refs/remotes/{remote}/git-annex"], cwd=root, check=False)
-    run(["git", "config", "annex.private", "true"], cwd=root)
-    run(["git", "annex", "init", description], cwd=root)
+    if remote is not None and run(command=["git", "remote", "get-url", remote], cwd=root, check=False).returncode == 0:
+        run(
+            command=["git", "fetch", remote, f"+refs/heads/git-annex:refs/remotes/{remote}/git-annex"],
+            cwd=root,
+            check=False,
+        )
+    run(command=["git", "config", "annex.private", "true"], cwd=root)
+    run(command=["git", "annex", "init", description], cwd=root)
 
 
-def save(root: pathlib.Path, paths: list[pathlib.Path], message: str) -> bool:
-    """``datalad save`` the given paths; returns whether a commit was made."""
-    before = run(["git", "rev-parse", "HEAD"], cwd=root, check=False).stdout.strip()
-    command = ["datalad", "save", "-d", str(root), "-m", message, *[str(path) for path in paths]]
-    run(command, cwd=root)
-    after = run(["git", "rev-parse", "HEAD"], cwd=root).stdout.strip()
-    return before != after
-
-
-def push(root: pathlib.Path, *, remote: str = "origin", branch: str, attempts: int = 4) -> None:
+def push(*, root: pathlib.Path, remote: str = "origin", branch: str, attempts: int = 4) -> None:
     """
-    Push HEAD to the branch, rebasing onto concurrent pushes.
+    Push HEAD to a branch, rebasing onto concurrent pushes.
 
-    Template updates from the central repository may land on main while a job runs, so a rejected
-    push is retried after integrating the remote's changes. No git-annex branch is pushed: the
-    capsule branches of a repository share its remote, and record nothing in git-annex anyway.
+    Template updates from the central repository may land on main while a job runs. A rejected
+    push is therefore retried after integrating the remote's changes. No git-annex branch is
+    pushed, since the capsule branches of a repository record nothing in git-annex.
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        The root of the clone.
+    remote : str, default="origin"
+        The remote to push to.
+    branch : str
+        The branch to push to.
+    attempts : int, default=4
+        How many times to try.
+
+    Raises
+    ------
+    RuntimeError
+        If every attempt is rejected.
+
     """
     for attempt in range(1, attempts + 1):
-        result = run(["git", "push", remote, f"HEAD:refs/heads/{branch}"], cwd=root, check=False)
+        result = run(command=["git", "push", remote, f"HEAD:refs/heads/{branch}"], cwd=root, check=False)
         if result.returncode == 0:
             return
         _log.warning("Push attempt %d failed:\n%s", attempt, result.stderr)
@@ -75,5 +129,5 @@ def push(root: pathlib.Path, *, remote: str = "origin", branch: str, attempts: i
             message = f"Could not push to {remote} after {attempts} attempts:\n{result.stderr}"
             raise RuntimeError(message)
         time.sleep(2**attempt)
-        run(["git", "fetch", remote, branch], cwd=root)
-        run(["git", "rebase", "FETCH_HEAD"], cwd=root)
+        run(command=["git", "fetch", remote, branch], cwd=root)
+        run(command=["git", "rebase", "FETCH_HEAD"], cwd=root)

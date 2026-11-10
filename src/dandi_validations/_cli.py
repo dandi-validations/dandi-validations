@@ -1,12 +1,27 @@
-"""Command line interface: ``dandi-validations {run,prepare,list-dandisets,ensure-repos,dispatch,collect}``."""
+"""Provide the ``dandi-validations`` command-line interface."""
 
 import argparse
+import collections.abc
+import importlib.metadata
+import json
 import logging
 import os
 import pathlib
 import sys
 
+from ._capsule import prepare_capsule
+from ._collect import collect
+from ._git import repository_root
 from ._globals import DEFAULT_PARAMS_KEY, ORGANIZATION
+from ._repositories import (
+    DEFAULT_REMOTE_URL_TEMPLATE,
+    GitHub,
+    dispatch_validations,
+    ensure_repositories,
+    list_dandisets,
+)
+from ._run import run_job
+from ._version_code import VersionCodeError, build_version_code, versions_from_pixi_lock
 
 
 def _token() -> str:
@@ -17,24 +32,20 @@ def _token() -> str:
     return token
 
 
-def _dandiset_ids(arguments: argparse.Namespace, *, from_organization: bool = False) -> list[str]:
-    if arguments.dandiset_ids:
-        identifiers = sorted(set(arguments.dandiset_ids))
+def _dandiset_ids(*, arguments: argparse.Namespace, from_organization: bool = False) -> list[str]:
+    if arguments.dandisets:
+        identifiers = sorted(set(arguments.dandisets))
     elif from_organization:
-        from ._repositories import GitHub
-
-        identifiers = GitHub(_token(), organization=arguments.organization).list_dandiset_repositories()
+        identifiers = GitHub(token=_token(), organization=arguments.organization).list_dandiset_repositories()
     else:
-        from ._repositories import list_dandisets
-
-        identifiers = list_dandisets(source=arguments.source)
+        identifiers = list_dandisets(arguments.source)
     if arguments.limit is not None:
         identifiers = identifiers[: arguments.limit]
     return identifiers
 
 
-def _add_selection_arguments(parser: argparse.ArgumentParser, *, source: bool) -> None:
-    parser.add_argument("--dandiset-ids", nargs="*", default=None, help="Only these Dandisets.")
+def _add_selection_arguments(*, parser: argparse.ArgumentParser, source: bool) -> None:
+    parser.add_argument("--dandisets", nargs="*", default=None, help="Only these Dandisets.")
     parser.add_argument("--limit", type=int, default=None, help="At most this many Dandisets.")
     parser.add_argument("--organization", default=ORGANIZATION)
     if source:
@@ -46,167 +57,189 @@ def _add_selection_arguments(parser: argparse.ArgumentParser, *, source: bool) -
         )
 
 
-def main(argv: list[str] | None = None) -> int:
-    from . import __version__
+def _add_capsule_arguments(parser: argparse.ArgumentParser, /) -> None:
+    parser.add_argument("--dandiset", required=True, help="The six-digit identifier of the Dandiset.")
+    parser.add_argument("--version", default="draft", help="The Dandiset version (draft, or a published one).")
+    parser.add_argument("--params", default=DEFAULT_PARAMS_KEY, help="The registered parameter set.")
+    parser.add_argument("--force", action="store_true", help="Validate even if the capsule validated these inputs.")
+    parser.add_argument("--path", type=pathlib.Path, default=pathlib.Path.cwd(), help="A path in the clone of main.")
 
+
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dandi-validations", description=__doc__)
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("--log-level", default="INFO")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {importlib.metadata.version('dandi-validations')}",
+    )
+    parser.add_argument("--verbosity", default="INFO", help="The logging level.")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = commands.add_parser("run", help="Form, execute, record (and push) a validation job capsule.")
-    run_parser.add_argument("--dandiset-id", required=True)
-    run_parser.add_argument("--dandiset-version", default="draft")
-    run_parser.add_argument("--params", default=DEFAULT_PARAMS_KEY, help="Registered parameter set.")
-    run_parser.add_argument("--force", action="store_true", help="Validate even if an equivalent job succeeded.")
+    run_parser = commands.add_parser("run", help="Form, execute, record and push a validation job capsule.")
+    _add_capsule_arguments(run_parser)
     run_parser.add_argument("--push", metavar="REMOTE", default=None, help="Push the capsule to this remote.")
-    run_parser.add_argument("--branch", default=None, help="Branch to push to (default: main).")
-    run_parser.add_argument("--time-limit-minutes", type=float, default=0, help="Stop the run after this long.")
-    run_parser.add_argument("--path", type=pathlib.Path, default=pathlib.Path.cwd())
+    run_parser.add_argument("--branch", default=None, help="The branch to push main to (default: main).")
+    run_parser.add_argument("--timeout", type=float, default=0, help="Stop the run after this many minutes.")
     run_parser.add_argument(
-        "--manifest-directory",
+        "--manifest",
         type=pathlib.Path,
         default=None,
-        help="Read assets.jsonld and dandiset.yaml from here instead of the archive's S3 bucket.",
+        help="A directory to read assets.jsonld and dandiset.yaml from, instead of the archive's S3 bucket.",
     )
-    run_parser.add_argument("--claim-only", action="store_true", help="Form and claim the capsule, but do not run it.")
+    run_parser.add_argument("--claim", action="store_true", help="Only form and claim the capsule. Do not run it.")
 
-    prepare_parser = commands.add_parser("prepare", help="Only form the job capsule (do not run it).")
-    prepare_parser.add_argument("--dandiset-id", required=True)
-    prepare_parser.add_argument("--dandiset-version", default="draft")
-    prepare_parser.add_argument("--params", default=DEFAULT_PARAMS_KEY)
-    prepare_parser.add_argument("--force", action="store_true")
-    prepare_parser.add_argument("--path", type=pathlib.Path, default=pathlib.Path.cwd())
+    prepare_parser = commands.add_parser("prepare", help="Only form the job capsule, without git.")
+    _add_capsule_arguments(prepare_parser)
 
     list_parser = commands.add_parser("list-dandisets", help="List the Dandisets to validate.")
-    _add_selection_arguments(list_parser, source=True)
+    _add_selection_arguments(parser=list_parser, source=True)
 
     code_parser = commands.add_parser(
-        "version-code", help="Print the validator version code (dandi/dandi-archive#2987) of a lock or an image."
+        "version-code",
+        help="Print the validator version code (dandi/dandi-archive#2987) of a lock or an image.",
     )
     code_source = code_parser.add_mutually_exclusive_group(required=True)
-    code_source.add_argument("--pixi-lock", type=pathlib.Path, help="A pixi.lock to read the versions from.")
+    code_source.add_argument("--lock", type=pathlib.Path, help="A pixi.lock to read the versions from.")
     code_source.add_argument(
-        "--versions-json",
+        "--versions",
         type=pathlib.Path,
         help="The output of the image's dandi-validation-versions ('-' for stdin).",
     )
 
     ensure_parser = commands.add_parser(
-        "ensure-repos", help="Create missing Dandiset repositories and sync the template into them."
+        "ensure-repos",
+        help="Create missing Dandiset repositories and sync the template into them.",
     )
-    _add_selection_arguments(ensure_parser, source=True)
-    ensure_parser.add_argument("--codebase-ref", default="main", help="Ref of this repository the template uses.")
-    ensure_parser.add_argument("--no-create", action="store_true", help="Only sync repositories that exist.")
+    _add_selection_arguments(parser=ensure_parser, source=True)
+    ensure_parser.add_argument("--ref", default="main", help="The ref of this repository that the template uses.")
+    ensure_parser.add_argument("--existing", action="store_true", help="Only sync repositories that exist.")
     ensure_parser.add_argument(
-        "--remote-url-template",
+        "--url",
         default=None,
-        help="Remote URL with {token}, {organization} and {repository} fields (default: GitHub over HTTPS).",
+        help="The remote URL, with {token}, {organization} and {repository} fields (default: GitHub over HTTPS).",
     )
 
-    dispatch_parser = commands.add_parser("dispatch", help="Trigger the validation workflow of Dandiset repositories.")
-    _add_selection_arguments(dispatch_parser, source=False)
+    dispatch_parser = commands.add_parser("dispatch", help="Start the Validate workflow of Dandiset repositories.")
+    _add_selection_arguments(parser=dispatch_parser, source=False)
     dispatch_parser.add_argument("--force", action="store_true")
-    dispatch_parser.add_argument("--dandiset-version", default="draft")
+    dispatch_parser.add_argument("--version", default="draft", help="The Dandiset version to validate.")
 
-    collect_parser = commands.add_parser("collect", help="Collect every Dandiset repository's jobs table.")
-    _add_selection_arguments(collect_parser, source=False)
+    collect_parser = commands.add_parser("collect", help="Collect the capsules of every Dandiset repository.")
+    _add_selection_arguments(parser=collect_parser, source=False)
     collect_parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path("records"))
+    return parser
 
-    arguments = parser.parse_args(argv)
-    logging.basicConfig(level=arguments.log_level.upper(), format="%(levelname)s %(name)s: %(message)s")
 
-    if arguments.command == "run":
-        from ._run import run_job
+def _run(arguments: argparse.Namespace, /) -> int:
+    return run_job(
+        path=arguments.path,
+        dandiset_id=arguments.dandiset,
+        dandiset_version=arguments.version,
+        params_key=arguments.params,
+        force=arguments.force,
+        push_to=arguments.push,
+        branch=arguments.branch,
+        time_limit_minutes=arguments.timeout,
+        manifest_directory=arguments.manifest,
+        execute=not arguments.claim,
+    )
 
-        return run_job(
-            path=arguments.path,
-            dandiset_id=arguments.dandiset_id,
-            dandiset_version=arguments.dandiset_version,
-            params_key=arguments.params,
-            force=arguments.force,
-            push_to=arguments.push,
-            branch=arguments.branch,
-            time_limit_minutes=arguments.time_limit_minutes,
-            manifest_directory=arguments.manifest_directory,
-            execute=not arguments.claim_only,
-        )
 
-    if arguments.command == "prepare":
-        from ._capsule import prepare_capsule
-        from ._git import repository_root
+def _prepare(arguments: argparse.Namespace, /) -> int:
+    result = prepare_capsule(
+        repository_root=repository_root(arguments.path),
+        dandiset_id=arguments.dandiset,
+        dandiset_version=arguments.version,
+        params_key=arguments.params,
+        force=arguments.force,
+    )
+    print(result.reason)
+    if result.capsule is not None:
+        print(result.capsule.path)
+    return 0
 
-        result = prepare_capsule(
-            repository_root=repository_root(arguments.path),
-            dandiset_id=arguments.dandiset_id,
-            dandiset_version=arguments.dandiset_version,
-            params_key=arguments.params,
-            force=arguments.force,
-        )
-        print(result.reason)
-        if result.capsule is not None:
-            print(result.capsule.path)
-        return 0
 
-    if arguments.command == "list-dandisets":
-        print("\n".join(_dandiset_ids(arguments)))
-        return 0
+def _list_dandisets(arguments: argparse.Namespace, /) -> int:
+    print("\n".join(_dandiset_ids(arguments=arguments)))
+    return 0
 
-    if arguments.command == "version-code":
-        import json
 
-        from ._version_code import VersionCodeError, build_version_code, versions_from_pixi_lock
+def _version_code(arguments: argparse.Namespace, /) -> int:
+    if arguments.lock is not None:
+        versions = versions_from_pixi_lock(arguments.lock.read_text())
+    else:
+        text = sys.stdin.read() if str(arguments.versions) == "-" else arguments.versions.read_text()
+        versions = json.loads(text)["validator_versions"]
+    try:
+        print(build_version_code(versions))
+    except VersionCodeError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    return 0
 
-        if arguments.pixi_lock is not None:
-            versions = versions_from_pixi_lock(arguments.pixi_lock.read_text())
-        else:
-            text = sys.stdin.read() if str(arguments.versions_json) == "-" else arguments.versions_json.read_text()
-            versions = json.loads(text)["validator_versions"]
-        try:
-            print(build_version_code(versions))
-        except VersionCodeError as error:
-            print(f"error: {error}", file=sys.stderr)
-            return 1
-        return 0
 
-    if arguments.command == "ensure-repos":
-        from ._repositories import DEFAULT_REMOTE_URL_TEMPLATE, ensure_repositories
+def _ensure_repositories(arguments: argparse.Namespace, /) -> int:
+    outcomes = ensure_repositories(
+        dandiset_ids=_dandiset_ids(arguments=arguments),
+        token=_token(),
+        codebase_ref=arguments.ref,
+        organization=arguments.organization,
+        remote_url_template=arguments.url or DEFAULT_REMOTE_URL_TEMPLATE,
+        create=not arguments.existing,
+    )
+    return 1 if any(outcome.startswith("error") for outcome in outcomes.values()) else 0
 
-        outcomes = ensure_repositories(
-            dandiset_ids=_dandiset_ids(arguments),
-            token=_token(),
-            codebase_ref=arguments.codebase_ref,
-            organization=arguments.organization,
-            remote_url_template=arguments.remote_url_template or DEFAULT_REMOTE_URL_TEMPLATE,
-            create=not arguments.no_create,
-        )
-        return 1 if any(outcome.startswith("error") for outcome in outcomes.values()) else 0
 
-    if arguments.command == "dispatch":
-        from ._repositories import dispatch_validations
+def _dispatch(arguments: argparse.Namespace, /) -> int:
+    outcomes = dispatch_validations(
+        dandiset_ids=_dandiset_ids(arguments=arguments, from_organization=True),
+        token=_token(),
+        organization=arguments.organization,
+        force=arguments.force,
+        dandiset_version=arguments.version,
+    )
+    return 1 if any(outcome.startswith("error") for outcome in outcomes.values()) else 0
 
-        outcomes = dispatch_validations(
-            dandiset_ids=_dandiset_ids(arguments, from_organization=True),
-            token=_token(),
-            organization=arguments.organization,
-            force=arguments.force,
-            dandiset_version=arguments.dandiset_version,
-        )
-        return 1 if any(outcome.startswith("error") for outcome in outcomes.values()) else 0
 
-    if arguments.command == "collect":
-        from ._collect import collect
+def _collect(arguments: argparse.Namespace, /) -> int:
+    written = collect(
+        dandiset_ids=_dandiset_ids(arguments=arguments, from_organization=True),
+        output_directory=arguments.output,
+        organization=arguments.organization,
+    )
+    print("\n".join(str(path) for path in written))
+    return 0
 
-        written = collect(
-            dandiset_ids=_dandiset_ids(arguments, from_organization=True),
-            output_directory=arguments.output,
-            organization=arguments.organization,
-        )
-        print("\n".join(str(path) for path in written))
-        return 0
 
-    parser.error(f"Unknown command {arguments.command!r}")
-    return 2
+_COMMANDS: dict[str, collections.abc.Callable[[argparse.Namespace], int]] = {
+    "run": _run,
+    "prepare": _prepare,
+    "list-dandisets": _list_dandisets,
+    "version-code": _version_code,
+    "ensure-repos": _ensure_repositories,
+    "dispatch": _dispatch,
+    "collect": _collect,
+}
+
+
+def main(argv: list[str] | None = None, /) -> int:
+    """
+    Run the ``dandi-validations`` command line.
+
+    Parameters
+    ----------
+    argv : list[str] or None, default=None
+        The arguments, if not those of this process.
+
+    Returns
+    -------
+    int
+        The exit code.
+
+    """
+    arguments = _build_parser().parse_args(argv)
+    logging.basicConfig(level=arguments.verbosity.upper(), format="%(levelname)s %(name)s: %(message)s")
+    return _COMMANDS[arguments.command](arguments)
 
 
 if __name__ == "__main__":

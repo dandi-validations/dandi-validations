@@ -1,42 +1,84 @@
 """
-Behavior of capsules, without git. What a capsule contains is shown, file by file, by the golden
-example (see tests/README.md and test_golden_example.py).
+Behavior of capsules, without git.
+
+What a capsule contains is shown, file by file, by the golden example (see tests/README.md and
+test_golden_example.py).
 """
 
+import dataclasses
 import datetime
+import pathlib
 
-from dandi_validations._capsule import (
+import pytest
+
+from dandi_validations import (
+    Capsule,
+    Pipeline,
+    PrepareResult,
     capsule_status,
     list_capsules,
+    load_pipeline,
     prepare_capsule,
     read_dataset_description,
     read_provenance,
 )
-from dandi_validations._pipeline import load_pipeline
 
-NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.timezone.utc)
+NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.UTC)
 
 
-def _prepare(root, assets_jsonld, dandiset_yaml, **kwargs):
+def _prepare(  # noqa: PLR0913
+    *,
+    root: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+    now: datetime.datetime = NOW,
+    force: bool = False,
+    pipeline: Pipeline | None = None,
+) -> PrepareResult:
     return prepare_capsule(
         repository_root=root,
         dandiset_id="000123",
         assets_jsonld=assets_jsonld,
         dandiset_yaml=dandiset_yaml,
-        now=kwargs.pop("now", NOW),
-        **kwargs,
+        now=now,
+        force=force,
+        pipeline=pipeline,
     )
 
 
-def _complete(capsule):
+def _formed(
+    *,
+    root: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+    force: bool = False,
+    pipeline: Pipeline | None = None,
+) -> Capsule:
+    capsule = _prepare(
+        root=root,
+        assets_jsonld=assets_jsonld,
+        dandiset_yaml=dandiset_yaml,
+        force=force,
+        pipeline=pipeline,
+    ).capsule
+    assert capsule is not None
+    return capsule
+
+
+def _complete(capsule: Capsule, /) -> None:
     capsule.logs_directory.mkdir(exist_ok=True)
     (capsule.logs_directory / "run.json").write_text("{}")
     capsule.derivatives_directory.mkdir()
     (capsule.derivatives_directory / "summary.json").write_text("{}")
 
 
-def test_capsule_has_its_own_study_dataset_description(git_repository, assets_jsonld, dandiset_yaml):
-    capsule = _prepare(git_repository, assets_jsonld, dandiset_yaml).capsule
+@pytest.mark.ai_generated
+def test_capsule_has_its_own_study_dataset_description(
+    git_repository: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+) -> None:
+    capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
     description = read_dataset_description(capsule.path)
     assert description["DatasetType"] == "study"
     assert read_provenance(capsule.path) == description["DandiValidations"]
@@ -44,40 +86,60 @@ def test_capsule_has_its_own_study_dataset_description(git_repository, assets_js
     assert not (git_repository / "dataset_description.json").exists()
 
 
-def test_reruns_replace_the_capsule_in_place(git_repository, assets_jsonld, dandiset_yaml):
-    first = _prepare(git_repository, assets_jsonld, dandiset_yaml).capsule
+@pytest.mark.ai_generated
+def test_reruns_replace_the_capsule_in_place(
+    git_repository: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+) -> None:
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
 
     # A failed run (logs, no results) is retried in the same capsule.
     first.logs_directory.mkdir()
     (first.logs_directory / "run.json").write_text("{}")
     assert capsule_status(first.path) == "failed"
-    retry = _prepare(git_repository, assets_jsonld, dandiset_yaml).capsule
+    retry = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
     assert retry.path == first.path
-    assert not retry.logs_directory.exists() and capsule_status(retry.path) == "stalled"
+    assert not retry.logs_directory.exists()
+    assert capsule_status(retry.path) == "stalled"
 
     # A successful capsule is not run again for the same inputs, on any day, unless forced.
     _complete(retry)
     assert capsule_status(retry.path) == "successful"
-    skipped = _prepare(git_repository, assets_jsonld, dandiset_yaml, now=NOW + datetime.timedelta(days=3))
-    assert skipped.capsule is None and retry.name in skipped.reason
-    forced = _prepare(git_repository, assets_jsonld, dandiset_yaml, force=True).capsule
-    assert forced.path == first.path and not forced.derivatives_directory.exists()
+    skipped = _prepare(
+        root=git_repository,
+        assets_jsonld=assets_jsonld,
+        dandiset_yaml=dandiset_yaml,
+        now=NOW + datetime.timedelta(days=3),
+    )
+    assert skipped.capsule is None
+    assert retry.name in skipped.reason
+    forced = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, force=True)
+    assert forced.path == first.path
+    assert not forced.derivatives_directory.exists()
 
     # Changed content is validated again, in the same capsule, and its provenance replaced.
     _complete(forced)
     before = read_provenance(forced.path)["source_digest"]
-    changed = _prepare(git_repository, assets_jsonld, dandiset_yaml + b"description: changed\n").capsule
-    assert changed.path == first.path and capsule_status(changed.path) == "stalled"
+    changed_yaml = dandiset_yaml + b"description: changed\n"
+    changed = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=changed_yaml)
+    assert changed.path == first.path
+    assert capsule_status(changed.path) == "stalled"
     assert read_provenance(changed.path)["source_digest"] != before
     assert list_capsules(git_repository) == [first.path]
 
 
-def test_each_image_has_its_own_capsule(git_repository, assets_jsonld, dandiset_yaml):
+@pytest.mark.ai_generated
+def test_each_image_has_its_own_capsule(
+    git_repository: pathlib.Path,
+    assets_jsonld: bytes,
+    dandiset_yaml: bytes,
+) -> None:
     pipeline = load_pipeline()
     newer_code = "d0.83.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
-    newer = pipeline.__class__(**{**pipeline.__dict__, "container_version": newer_code})
-    first = _prepare(git_repository, assets_jsonld, dandiset_yaml).capsule
-    second = _prepare(git_repository, assets_jsonld, dandiset_yaml, pipeline=newer).capsule
+    newer = dataclasses.replace(pipeline, container_version=newer_code)
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    second = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, pipeline=newer)
     assert first.path != second.path
     assert list_capsules(git_repository) == sorted([first.path, second.path])
     assert read_provenance(first.path)["version"] == pipeline.container_version
@@ -85,22 +147,36 @@ def test_each_image_has_its_own_capsule(git_repository, assets_jsonld, dandiset_
     assert read_dataset_description(second.path)["GeneratedBy"][1]["Container"]["Tag"] == newer_code
 
 
-def test_nothing_to_stream(git_repository, dandiset_yaml):
-    result = _prepare(git_repository, b"[]", dandiset_yaml)
-    assert result.capsule is None and "no assets" in result.reason
+@pytest.mark.ai_generated
+def test_nothing_to_stream(git_repository: pathlib.Path, dandiset_yaml: bytes) -> None:
+    result = _prepare(root=git_repository, assets_jsonld=b"[]", dandiset_yaml=dandiset_yaml)
+    assert result.capsule is None
+    assert "no assets" in result.reason
 
 
-def test_capsule_status_levels(tmp_path):
+SUBMITTED = "code/submitted_date-2026+11+05_time-00+00+00"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    ("contents", "expected_status"),
+    [
+        ([], "unknown"),
+        (["code/"], "pending"),
+        ([SUBMITTED], "stalled"),
+        # An empty logs directory is not a log.
+        ([SUBMITTED, "logs/"], "stalled"),
+        ([SUBMITTED, "logs/submit.log"], "failed"),
+        ([SUBMITTED, "logs/submit.log", "derivatives/validation.jsonl"], "successful"),
+    ],
+)
+def test_capsule_status_levels(tmp_path: pathlib.Path, contents: list[str], expected_status: str) -> None:
     capsule = tmp_path / "pipeline-dandi+validate_tag-x"
-    assert capsule_status(capsule) == "unknown"
-    (capsule / "code").mkdir(parents=True)
-    assert capsule_status(capsule) == "pending"
-    (capsule / "code" / "submitted_date-2026+11+05_time-00+00+00").write_text("x")
-    assert capsule_status(capsule) == "stalled"
-    (capsule / "logs").mkdir()
-    assert capsule_status(capsule) == "stalled"  # An empty logs directory is not a log
-    (capsule / "logs" / "submit.log").write_text("x")
-    assert capsule_status(capsule) == "failed"
-    (capsule / "derivatives").mkdir()
-    (capsule / "derivatives" / "validation.jsonl").write_text("")
-    assert capsule_status(capsule) == "successful"
+    for relative in contents:
+        path = capsule / relative
+        if relative.endswith("/"):
+            path.mkdir(parents=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("x")
+    assert capsule_status(capsule) == expected_status

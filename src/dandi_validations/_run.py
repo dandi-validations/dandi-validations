@@ -1,4 +1,4 @@
-"""Run one validation job in a Dandiset repository: form the capsule, execute it, record it, push it."""
+"""Run one validation job in a Dandiset repository, by forming, executing, recording and pushing its capsule."""
 
 import datetime
 import json
@@ -40,6 +40,7 @@ _GITHUB_ENVIRONMENT = {
     "ImageOS": "image_os",
     "ImageVersion": "image_version",
 }
+_TIMEOUT_EXIT_CODE = 124
 
 
 def _github_context() -> dict:
@@ -50,13 +51,12 @@ def _github_context() -> dict:
     return context
 
 
-def _execute(capsule: Capsule, *, time_limit_minutes: float, log_file_path: pathlib.Path) -> int:
-    """Run the capsule's submit.sh, teeing its output into the capsule's logs."""
+def _execute(*, capsule: Capsule, time_limit_minutes: float, log_file_path: pathlib.Path) -> int:
     command = ["bash", str(capsule.submit_script_path)]
     if time_limit_minutes > 0:
-        # --foreground: signal only submit.sh, whose trap stops the run's own process group and
-        # lets duct write its records. Without it, timeout signals its whole process group,
-        # duct included, and the run's processes are orphaned.
+        # With --foreground, timeout signals only submit.sh, whose trap stops the run's own process
+        # group and lets duct write its records. Otherwise duct is signalled too and the run's
+        # processes are orphaned.
         command = [
             "timeout",
             "--foreground",
@@ -66,24 +66,25 @@ def _execute(capsule: Capsule, *, time_limit_minutes: float, log_file_path: path
             *command,
         ]
     log_file_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_file_path.open("w") as log_file:
-        process = subprocess.Popen(
+    with (
+        log_file_path.open("w") as log_file,
+        subprocess.Popen(
             command,
             cwd=capsule.path,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
+        ) as process,
+    ):
+        for line in process.stdout or ():
             sys.stdout.write(line)
             sys.stdout.flush()
             log_file.write(line)
         return process.wait()
 
 
-def run_job(
+def run_job(  # noqa: PLR0913
     *,
     path: pathlib.Path,
     dandiset_id: str,
@@ -100,72 +101,100 @@ def run_job(
     """
     Validate a Dandiset in the capsule of the pinned image, from a clone of the repository's main.
 
-    The capsule's branch is checked out (or started) as a worktree of this clone, its run is
-    committed to it, and main's submodule for it is pinned to the result, both when the run is
-    claimed and when it is recorded. With ``push_to``, both branches are pushed at each point.
+    The capsule's branch is checked out (or started) as a worktree of this clone, and its run is
+    committed to it. Main's submodule for it is pinned to the result, both when the run is claimed
+    and when it is recorded. With ``push_to``, both branches are pushed at each point.
 
-    ``manifest_directory`` holds the Dandiset's ``assets.jsonld`` and ``dandiset.yaml`` to use
-    instead of the archive's current ones on S3 (e.g. a frozen copy, to rerun a capsule or test).
-    Without ``execute``, the capsule is only formed and claimed, not run.
+    Parameters
+    ----------
+    path : pathlib.Path
+        A path in the clone of the repository's main.
+    dandiset_id : str
+        The six-digit identifier of the Dandiset.
+    dandiset_version : str, default="draft"
+        The Dandiset version.
+    params_key : str, default="default"
+        The registered parameter set.
+    force : bool, default=False
+        Whether to validate even if the capsule already validated these inputs.
+    push_to : str or None, default=None
+        The remote to push the capsule's branch and main to.
+    branch : str or None, default=None
+        The branch to push main to, if not ``main``.
+    time_limit_minutes : float, default=0
+        Stop the run after this many minutes (0 for no limit).
+    manifest_directory : pathlib.Path or None, default=None
+        A directory holding the Dandiset's ``assets.jsonld`` and ``dandiset.yaml`` to use instead
+        of the archive's current ones on S3 (e.g., a frozen copy, to rerun a capsule or test).
+    execute : bool, default=True
+        Whether to run the capsule, rather than only form and claim it.
+    now : datetime.datetime or None, default=None
+        When the run is formed, if not now.
+
+    Returns
+    -------
+    int
+        The exit code, which is 0 for a successful (or skipped) validation.
+
     """
     root = repository_root(path)
     branch = branch or DEFAULT_BRANCH
     remote = push_to or "origin"
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
-    ensure_annex(root, remote=None)
+    ensure_annex(root=root, remote=None)
 
-    manifest = {}
+    assets_jsonld = dandiset_yaml = None
     if manifest_directory is not None:
-        manifest = {
-            "assets_jsonld": (manifest_directory / "assets.jsonld").read_bytes(),
-            "dandiset_yaml": (manifest_directory / "dandiset.yaml").read_bytes(),
-        }
+        assets_jsonld = (manifest_directory / "assets.jsonld").read_bytes()
+        dandiset_yaml = (manifest_directory / "dandiset.yaml").read_bytes()
     plan = plan_capsule(
         repository_root=root,
         dandiset_id=dandiset_id,
         dandiset_version=dandiset_version,
         params_key=params_key,
-        **manifest,
+        assets_jsonld=assets_jsonld,
+        dandiset_yaml=dandiset_yaml,
     )
     if isinstance(plan, str):
-        print(plan, flush=True)
+        _log.info("%s", plan)
         return 0
     capsule = plan.capsule
-    if not checkout_capsule(root, capsule, remote if push_to else None):
-        create_capsule(root, capsule)
+    if not checkout_capsule(main_root=root, capsule=capsule, remote=remote if push_to else None):
+        create_capsule(main_root=root, capsule=capsule)
     if not force and is_up_to_date(plan):
-        print(f"{capsule.name} already validated these inputs; nothing to do (use --force to validate again).")
+        _log.info("%s already validated these inputs; nothing to do (use --force to validate again).", capsule.name)
         return 0
 
-    sourcedata = link_sourcedata(capsule)
+    sourcedata = link_sourcedata(capsule=capsule)
     if sourcedata is None:
-        print(f"Dandiset {dandiset_id} has no DataLad mirror to link as sourcedata/.", flush=True)
-    write_capsule(plan, sourcedata=sourcedata, now=now)
-    print(f"Formed {capsule.name} for {plan.number_of_assets} assets.", flush=True)
+        _log.info("Dandiset %s has no DataLad mirror to link as sourcedata/.", dandiset_id)
+    write_capsule(plan=plan, sourcedata=sourcedata, now=now)
+    _log.info("Formed %s for %d assets.", capsule.name, plan.number_of_assets)
 
-    # Claim the capsule before running it, so that a run that never reports back reads as stalled.
-    # This also replaces the results of the capsule's previous run, which stay in its branch's history.
-    _commit_and_publish(
-        root,
-        capsule,
+    # Claiming the capsule before running it makes a run that never reports back read as stalled.
+    commit_and_publish(
+        main_root=root,
+        capsule=capsule,
         paths=[capsule.path],
         message=f"Submit {capsule.name}: dandi validate of Dandiset {dandiset_id} ({dandiset_version})",
         push_to=push_to,
         branch=branch,
     )
     if not execute:
-        print(f"{capsule.name}: claimed, not run.", flush=True)
+        _log.info("%s: claimed, not run.", capsule.name)
         return 0
 
-    started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    started_at = datetime.datetime.now(tz=datetime.UTC)
     exit_code = _execute(
-        capsule, time_limit_minutes=time_limit_minutes, log_file_path=capsule.logs_directory / "submit.log"
+        capsule=capsule,
+        time_limit_minutes=time_limit_minutes,
+        log_file_path=capsule.logs_directory / "submit.log",
     )
-    finished_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    finished_at = datetime.datetime.now(tz=datetime.UTC)
 
     run_record = {
         "exit_code": exit_code,
-        "timed_out": exit_code == 124,
+        "timed_out": exit_code == _TIMEOUT_EXIT_CODE,
         "started_at": started_at.replace(microsecond=0).isoformat(),
         "finished_at": finished_at.replace(microsecond=0).isoformat(),
         "host": {"python": platform.python_version(), "platform": platform.platform()},
@@ -174,40 +203,62 @@ def run_job(
     (capsule.logs_directory / "run.json").write_text(json.dumps(run_record, indent=2) + "\n")
 
     status = capsule_status(capsule.path)
-    _commit_and_publish(
-        root,
-        capsule,
+    commit_and_publish(
+        main_root=root,
+        capsule=capsule,
         paths=[capsule.logs_directory],
         message=f"Record {capsule.name} ({status})",
         push_to=push_to,
         branch=branch,
     )
 
-    print(f"{capsule.name}: {status} (exit code {exit_code})", flush=True)
+    _log.info("%s: %s (exit code %d)", capsule.name, status, exit_code)
     if status == "successful":
         return 0
     return exit_code or 1
 
 
-def _commit_and_publish(
-    root: pathlib.Path,
-    capsule: Capsule,
+def commit_and_publish(  # noqa: PLR0913
     *,
+    main_root: pathlib.Path,
+    capsule: Capsule,
     paths: list[pathlib.Path],
     message: str,
     push_to: str | None,
     branch: str,
 ) -> None:
-    """Commit the capsule's branch, then pin main's submodule for it (pushing both with ``push_to``)."""
-    commit_capsule(capsule, paths, message)
+    """
+    Commit a capsule's branch, then pin main's submodule for it.
+
+    Parameters
+    ----------
+    main_root : pathlib.Path
+        The root of the clone of main.
+    capsule : Capsule
+        The capsule.
+    paths : list[pathlib.Path]
+        The paths of the capsule to commit.
+    message : str
+        The commit message, for both branches.
+    push_to : str or None
+        The remote to push both branches to, if any.
+    branch : str
+        The branch to push main to.
+
+    """
+    commit_capsule(capsule=capsule, paths=paths, message=message)
     if push_to:
-        commit = publish_capsule(root, capsule, push_to)
-        url = remote_url(root, push_to)
-        prune_submodules(root, branches=capsule_branches(root, push_to), pipeline=capsule.pipeline)
+        commit = publish_capsule(main_root=main_root, capsule=capsule, remote=push_to)
+        url = remote_url(root=main_root, remote=push_to)
+        prune_submodules(
+            main_root=main_root,
+            branches=capsule_branches(main_root=main_root, remote=push_to),
+            pipeline=capsule.pipeline,
+        )
     else:
-        commit = run(["git", "rev-parse", f"refs/heads/{capsule.tag}"], cwd=root).stdout.strip()
-        url = remote_url(root, "origin") or f"./{capsule.name}"
-    register_submodule(root, capsule, url=url, commit=commit)
-    commit_main(root, [], message)
+        commit = run(command=["git", "rev-parse", f"refs/heads/{capsule.tag}"], cwd=main_root).stdout.strip()
+        url = remote_url(root=main_root, remote="origin")
+    register_submodule(main_root=main_root, capsule=capsule, url=url or f"./{capsule.name}", commit=commit)
+    commit_main(main_root=main_root, paths=[], message=message)
     if push_to:
-        push(root, remote=push_to, branch=branch)
+        push(root=main_root, remote=push_to, branch=branch)

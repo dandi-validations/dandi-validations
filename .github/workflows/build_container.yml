@@ -52,7 +52,7 @@ jobs:
         id: code
         run: |
           set -euo pipefail
-          code="$(dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock)"
+          code="$(dandi-validations version-code --lock containers/dandi-validation/pixi.lock)"
           pinned="$(jq -r '.container.version' src/dandi_validations/pipeline.json)"
           image="$(jq -r '.container.image' src/dandi_validations/pipeline.json | tr '[:upper:]' '[:lower:]')"
           if [ "$code" != "$pinned" ]; then
@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm "$REFERENCE" dandi-validation-versions > versions.json
-          built="$(dandi-validations version-code --versions-json versions.json)"
+          built="$(dandi-validations version-code --versions versions.json)"
           if [ "$built" != "${{ steps.code.outputs.code }}" ]; then
             echo "::error::The built image's validators make up version code ${built}, not ${{ steps.code.outputs.code }}."
             exit 1

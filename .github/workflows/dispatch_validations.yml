@@ -58,6 +58,6 @@ jobs:
         run: |
           set -euo pipefail
           selection=()
-          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandiset-ids $DANDISET_IDS); fi
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
           if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
-          dandi-validations dispatch "${selection[@]}" --dandiset-version "$DANDISET_VERSION" $FORCE
+          dandi-validations dispatch "${selection[@]}" --version "$DANDISET_VERSION" $FORCE

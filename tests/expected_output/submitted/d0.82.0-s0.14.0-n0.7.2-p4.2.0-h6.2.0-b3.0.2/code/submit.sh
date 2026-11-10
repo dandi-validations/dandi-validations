@@ -79,7 +79,7 @@ mkdir -p "${CAPSULE}/logs"
 apptainer exec --cleanenv "$CONTAINER_IMAGE_PATH" dandi-validation-versions > "${CAPSULE}/logs/container_versions.json"
 
 # Refuse to run unless the image's installed validators make up the version code it was taken for.
-image_version_code="$(dandi-validations version-code --versions-json "${CAPSULE}/logs/container_versions.json")"
+image_version_code="$(dandi-validations version-code --versions "${CAPSULE}/logs/container_versions.json")"
 if [ "$image_version_code" != "$VERSION_CODE" ]; then
     echo "The image's validators make up version code ${image_version_code}, not ${VERSION_CODE}." >&2
     exit 1
@@ -87,6 +87,7 @@ fi
 
 run_started="$(mktemp)"
 stopped=0
+# shellcheck disable=SC2329  # Called by the trap below.
 stop_run() {
     trap '' TERM INT
     stopped=1

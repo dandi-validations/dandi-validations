@@ -34,7 +34,7 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
     ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
     │            container_versions.json, run.json, submit.log
     ├── derivatives/  ← validation.jsonl (sorted by file, then issue), summary.json (plain text)
-    ├── envs/dandi-validation/image  ← the image's registration (annexed; its content on GHCR)
+    ├── envs/dandi-validation/image  ← the image's registration (annexed, with its content on GHCR)
     └── sourcedata/  ← subdataset: https://github.com/dandisets/{dandiset_id} at its draft head
 ```
 
@@ -47,7 +47,7 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
   change, or a failure) replaces its contents in a new commit, so the branch's history keeps every
   earlier run.
 - **Two `dataset_description.json`.** `main`'s describes the repository as a derivative dataset
-  collecting the capsules; the template sync manages it. Each capsule's describes the capsule as a
+  collecting the capsules. The template sync manages it. Each capsule's describes the capsule as a
   BIDS study dataset: it holds its raw data under `sourcedata/` and its results under
   `derivatives/`. A job writes it with the provenance of the run:
   - `GeneratedBy` names dandi-cli, the image in BIDS's `Container` (tag and digest), and this code.
@@ -67,8 +67,8 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
   clone of the repository, checked out at its submodule's path, so all of them share one object
   store and one git-annex. git-annex is initialized with `annex.private`, and no git-annex branch
   is ever pushed, so ephemeral clones leave no trace.
-- **Readable files.** Capsule files are kept in git, uncompressed, so they can be read on GitHub;
-  only the image is annexed. GitHub refuses files over 100 MiB, so a run whose results would
+- **Readable files.** Capsule files are kept in git, uncompressed, so they can be read on GitHub.
+  Only the image is annexed. GitHub refuses files over 100 MiB, so a run whose results would
   exceed that records no results and is left *failed*, saying so in its logs.
 
 To get a Dandiset's results:
@@ -96,9 +96,9 @@ workflow), `dandi-validations run`, from a checkout of `main`:
 2. **Claims it.** It commits the capsule to its branch and pushes the branch, then pins `main`'s
    submodule to it and pushes `main`. A run that never reports back therefore reads as *stalled*.
 3. **Runs `code/submit.sh`** inside the capsule's dataset. The script:
-   - pulls the `dandi-validation` SIF from GHCR;
-   - registers it with `datalad containers-add` (`apptainer exec --cleanenv {img} {cmd}`);
-   - refuses to go on unless the image's installed validators make up the expected version code;
+   - pulls the `dandi-validation` SIF from GHCR
+   - registers it with `datalad containers-add` (`apptainer exec --cleanenv {img} {cmd}`)
+   - refuses to go on unless the image's installed validators make up the expected version code
    - executes `code/run.sh` inside the image with `datalad containers-run`, wrapped in
      [duct](https://github.com/con/duct):
 
@@ -117,7 +117,7 @@ workflow), `dandi-validations run`, from a checkout of `main`:
    and a summary to `derivatives/`.
 4. **Records it.** duct's records, the image's versions, the GitHub Actions run and the output of
    `submit.sh` go to `logs/`. They are committed to the branch, and `main`'s submodule is pinned
-   again; both are pushed.
+   again. Both are pushed.
 
 `dandi validate` exits 1 whenever it reports an error, which is still a completed validation: it
 writes `--output` only once every file has been validated, so that file is what marks success. A
@@ -140,7 +140,7 @@ capsule *failed*.
   be a plain `MAJOR.MINOR.PATCH` release, except that a local segment is dropped. For example,
   dandi `0.82.0+28.gbec91fa4`, installed from the #1956 commit, appears as `d0.82.0`. Its full
   version stays in the image's `/opt/dandi-validation/versions.json` and in each job's
-  `logs/container_versions.json`. `dandi-validations version-code --pixi-lock` computes the code.
+  `logs/container_versions.json`. `dandi-validations version-code --lock` computes the code.
 
 The **Build and publish container** workflow mints, for the code that `pixi.lock` makes up:
 
@@ -162,14 +162,14 @@ they convert the OCI image, pinned by digest.
 To update the image:
 1. Change `pixi.toml` and run `pixi lock` in `containers/dandi-validation/`.
 2. Set `container.version` to the new code printed by
-   `dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock`.
+   `dandi-validations version-code --lock containers/dandi-validation/pixi.lock`.
 
 ## Workflows of this repository
 
 | Workflow | What it does |
 | --- | --- |
 | **Build and publish container** | Builds the image for the version code of `pixi.lock` and pushes the OCI image, its SIF and its lock to GHCR, unless that code is already published. |
-| **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them; optionally dispatches their validation. It never touches capsule branches or submodules. |
+| **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them. It can also dispatch their validation. It never touches capsule branches or submodules. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
 | **Collect records** | Every 6 hours, reads every capsule of every repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`. |
 | **Tests** | The tests, around one golden example (Dandiset 000006, see [`tests/README.md`](tests/README.md)): its expected repository contents and validation results are committed in `tests/expected_output/`, and one real job runs end to end. |
@@ -191,11 +191,11 @@ To update the image:
 ```bash
 pip install .
 dandi-validations list-dandisets --source s3 --limit 5
-dandi-validations version-code --pixi-lock containers/dandi-validation/pixi.lock
-dandi-validations prepare --dandiset-id 000006 --path /path/to/dataset   # form a capsule only
-dandi-validations run --dandiset-id 000006 --push origin                 # what the Validate workflow runs
-dandi-validations ensure-repos --dandiset-ids 000006 --codebase-ref main
-dandi-validations dispatch --dandiset-ids 000006
+dandi-validations version-code --lock containers/dandi-validation/pixi.lock
+dandi-validations prepare --dandiset 000006 --path /path/to/dataset   # form a capsule only
+dandi-validations run --dandiset 000006 --push origin                 # what the Validate workflow runs
+dandi-validations ensure-repos --dandisets 000006 --ref main
+dandi-validations dispatch --dandisets 000006
 dandi-validations collect --output records
 ```
 
@@ -203,4 +203,17 @@ To run one job locally end to end (needs Docker and Apptainer):
 
 ```bash
 bash scripts/e2e_local.sh 000006
+```
+
+## Development
+
+Code style, tests, commits and the changelog follow [`AGENTS.md`](AGENTS.md), which adopts the
+conventions of [CodyCBakerPhD/historia](https://github.com/CodyCBakerPhD/historia). Its
+[pre-commit](https://pre-commit.com) hooks run black, ruff, numpydoc validation, mypy, codespell,
+shellcheck and the workflow schema checks:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
 ```

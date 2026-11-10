@@ -18,14 +18,19 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
+
+import pytest
+
+from dandi_validations import sync_repository
 
 TESTS_DIRECTORY = pathlib.Path(__file__).parent
 EXAMPLE_DANDISET_ID = "000006"
 EXAMPLE_MANIFEST_DIRECTORY = TESTS_DIRECTORY / "example_dandiset" / EXAMPLE_DANDISET_ID
 EXPECTED_OUTPUT_DIRECTORY = TESTS_DIRECTORY / "expected_output"
 
-#: Everything a job would read from its clock or its environment, fixed.
-NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.timezone.utc)
+# Everything a job would read from its clock or its environment, fixed.
+NOW = datetime.datetime(2026, 11, 5, 20, 31, 5, tzinfo=datetime.UTC)
 ENVIRONMENT = {
     "GIT_AUTHOR_NAME": "github-actions[bot]",
     "GIT_AUTHOR_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com",
@@ -43,48 +48,72 @@ ENVIRONMENT = {
 
 REGENERATE = os.environ.get("DANDI_VALIDATIONS_REGENERATE_GOLDEN") == "1"
 _DATASET_ID_RE = re.compile(
-    r"((?:^|\s)(?:datalad-)?id = )[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.M
+    r"((?:^|\s)(?:datalad-)?id = )[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    re.MULTILINE,
 )
 _INTERMEDIATE_PATH_RE = re.compile(r'"[^"]*?/intermediate/')
 
 
 def git(*arguments: str, cwd: pathlib.Path) -> str:
+    """
+    Run git.
+
+    Returns
+    -------
+    str
+        Its output.
+
+    """
     return subprocess.run(["git", *arguments], cwd=cwd, capture_output=True, text=True, check=True).stdout
 
 
 @dataclasses.dataclass(frozen=True)
 class World:
-    """Local stand-ins for github.com, and a runner's clone of the example's repository."""
+    """
+    Stand in for github.com locally, next to a runner's clone of the example's repository.
+
+    Attributes
+    ----------
+    github : pathlib.Path
+        The directory that stands in for https://github.com/.
+    runner : pathlib.Path
+        The runner's clone of the example's repository.
+
+    """
 
     github: pathlib.Path
     runner: pathlib.Path
 
     @property
     def repository(self) -> pathlib.Path:
-        """The example's dandi-validations repository (https://github.com/dandi-validations/000006)."""
+        """Locate the example's repository, https://github.com/dandi-validations/000006."""
         return self.github / "dandi-validations" / EXAMPLE_DANDISET_ID
 
     @property
     def mirror(self) -> pathlib.Path:
-        """DANDI's DataLad mirror of the Dandiset (https://github.com/dandisets/000006)."""
+        """Locate DANDI's DataLad mirror of the Dandiset, https://github.com/dandisets/000006."""
         return self.github / "dandisets" / EXAMPLE_DANDISET_ID
 
 
-def make_world(tmp_path: pathlib.Path, monkeypatch) -> World:
+def make_world(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> World:
     """
     Stand in for github.com with local repositories, so jobs run offline and deterministically.
 
     git rewrites every https://github.com/ URL to a local directory, so the URLs the code records
     are the real ones. The mirror's draft is one commit of the example's dandiset.yaml.
-    """
-    from dandi_validations._repositories import sync_repository
 
+    Returns
+    -------
+    World
+        The stand-ins, with the example's repository synced from the template and cloned.
+
+    """
     github = tmp_path / "github"
     gitconfig = tmp_path / "gitconfig"
     gitconfig.write_text(
         "[init]\n\tdefaultBranch = main\n"
         '[protocol "file"]\n\tallow = always\n'
-        f'[url "file://{github}/"]\n\tinsteadOf = https://github.com/\n'
+        f'[url "file://{github}/"]\n\tinsteadOf = https://github.com/\n',
     )
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -120,8 +149,16 @@ def make_world(tmp_path: pathlib.Path, monkeypatch) -> World:
     return world
 
 
-def labels(world: World) -> dict[str, str]:
-    """Readable names for the commits that differ from run to run, as the expected output shows them."""
+def labels(world: World, /) -> dict[str, str]:
+    """
+    Name the commits that differ from run to run, as the expected output shows them.
+
+    Returns
+    -------
+    dict[str, str]
+        The placeholder of each commit.
+
+    """
     names = {}
     for branch, sha in _heads(world.repository).items():
         if branch != "main":
@@ -131,23 +168,33 @@ def labels(world: World) -> dict[str, str]:
     return names
 
 
-def _heads(repository: pathlib.Path) -> dict[str, str]:
+def _heads(repository: pathlib.Path, /) -> dict[str, str]:
     output = git("for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads", cwd=repository)
     return dict(line.split(" ", 1) for line in output.splitlines())
 
 
-def normalize(text: str, names: dict[str, str]) -> str:
-    """Replace what differs from run to run with the placeholders the expected output shows."""
+def normalize(*, text: str, names: dict[str, str]) -> str:
+    """
+    Replace what differs from run to run with the placeholders the expected output shows.
+
+    Returns
+    -------
+    str
+        The text, with placeholders.
+
+    """
     for sha, name in names.items():
         text = text.replace(sha, name)
     text = _DATASET_ID_RE.sub(r"\1<datalad dataset id>", text)
     return _INTERMEDIATE_PATH_RE.sub('"<capsule>/intermediate/', text)
 
 
-def materialize(repository: pathlib.Path, ref: str, destination: pathlib.Path, names: dict[str, str]) -> None:
+def materialize(*, repository: pathlib.Path, ref: str, destination: pathlib.Path, names: dict[str, str]) -> None:
     """
-    Write the files of ``ref`` as GitHub shows them: files with their content, symbolic links as
-    ``-> target``, and submodules as ``Subproject commit <commit>``.
+    Write the files of a ref as GitHub shows them.
+
+    Files hold their content, symbolic links show as ``-> target``, and submodules as
+    ``Subproject commit <commit>``.
     """
     output = git("ls-tree", "-r", "-z", ref, cwd=repository)
     for entry in filter(None, output.split("\0")):
@@ -161,11 +208,11 @@ def materialize(repository: pathlib.Path, ref: str, destination: pathlib.Path, n
             content = git("cat-file", "blob", sha, cwd=repository)
         target = destination / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(normalize(content, names))
+        target.write_text(normalize(text=content, names=names))
 
 
-def assert_matches_expected(actual: pathlib.Path, expected: pathlib.Path) -> None:
-    """Compare two directories file by file (regenerating ``expected`` from ``actual`` if asked)."""
+def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path) -> None:
+    """Compare two directories file by file, regenerating ``expected`` from ``actual`` if asked."""
     if REGENERATE:
         if expected.exists():
             shutil.rmtree(expected)
@@ -189,19 +236,21 @@ def assert_matches_expected(actual: pathlib.Path, expected: pathlib.Path) -> Non
                 tofile=f"actual/{relative}",
                 lineterm="",
             )
-            shown = list(itertools.islice(diff, 60))
-            raise AssertionError(f"Content of {relative} differs from {expected / relative}:\n" + "\n".join(shown))
+            shown = "\n".join(itertools.islice(diff, 60))
+            message = f"Content of {relative} differs from {expected / relative}:\n{shown}"
+            raise AssertionError(message)
 
 
-def check_validated(repository: pathlib.Path, tag: str, work: pathlib.Path) -> None:
-    """Compare a capsule's results (after a real run) with expected_output/validated."""
-    names = {}
+def check_validated(*, repository: pathlib.Path, tag: str, work: pathlib.Path) -> None:
+    """Compare a capsule's results after a real run with expected_output/validated."""
+    names: dict[str, str] = {}
     actual = work / "validated"
     for name in ("summary.json", "validation.jsonl"):
         content = git("show", f"{tag}:derivatives/{name}", cwd=repository)
         target = actual / tag / "derivatives" / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(normalize(content, names))
-    assert_matches_expected(actual, EXPECTED_OUTPUT_DIRECTORY / "validated")
+        target.write_text(normalize(text=content, names=names))
+    assert_matches_expected(actual=actual, expected=EXPECTED_OUTPUT_DIRECTORY / "validated")
     summary = json.loads((actual / tag / "derivatives" / "summary.json").read_text())
-    print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
+    counts = {key: summary[key] for key in ("total_results", "by_severity", "by_validator")}
+    sys.stdout.write(json.dumps(counts, indent=2) + "\n")

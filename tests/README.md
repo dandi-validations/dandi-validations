@@ -8,7 +8,7 @@ file by file: **Dandiset 000006**.
 **Input:** [`example_dandiset/000006/`](example_dandiset/000006) holds the archive's S3 manifest of
 the Dandiset's draft (`assets.jsonld`, pretty-printed for reading, and `dandiset.yaml`), frozen so
 that the expectations don't drift with the archive. Jobs read it instead of S3
-(`dandi-validations run --manifest-directory ...`).
+(`dandi-validations run --manifest ...`).
 
 **Expected output:** [`expected_output/`](expected_output) shows what the Dandiset's repository,
 `https://github.com/dandi-validations/000006`, holds:
@@ -27,7 +27,7 @@ that the expectations don't drift with the archive. Jobs read it instead of S3
     the image and runs the job for real, streaming the Dandiset's files from S3.
 
 Files are shown as GitHub shows them:
-- submodules as a file holding `Subproject commit <commit>`;
+- submodules as a file holding `Subproject commit <commit>`
 - symbolic links as a file holding `-> <target>`.
 
 Values that differ from run to run appear as placeholders:
@@ -40,8 +40,8 @@ Values that differ from run to run appear as placeholders:
 | `<capsule>` | where the capsule was checked out on the runner, in result paths |
 
 The rest is fixed in [`golden.py`](golden.py):
-- the clock: 2026-11-05T20:31:05Z;
-- the GitHub Actions run: run 1, attempt 1, of `dandi-validations/000006`;
+- the clock, 2026-11-05T20:31:05Z
+- the GitHub Actions run, run 1, attempt 1, of `dandi-validations/000006`
 - the image digest (`sha256:000...`) and the dandi-validations commit (`000...`).
 
 The sandbox's stand-in mirror has one `draft` commit holding the example's `dandiset.yaml`.

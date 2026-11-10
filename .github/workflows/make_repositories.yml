@@ -62,15 +62,15 @@ jobs:
         run: |
           set -euo pipefail
           selection=()
-          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandiset-ids $DANDISET_IDS); fi
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
           if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
-          dandi-validations ensure-repos "${selection[@]}" --codebase-ref "$CODEBASE_REF"
+          dandi-validations ensure-repos "${selection[@]}" --ref "$CODEBASE_REF"
 
       - name: Start their validations
         if: inputs.dispatch
         run: |
           set -euo pipefail
           selection=()
-          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandiset-ids $DANDISET_IDS); fi
+          if [ -n "$DANDISET_IDS" ]; then selection+=(--dandisets $DANDISET_IDS); fi
           if [ -n "$LIMIT" ]; then selection+=(--limit "$LIMIT"); fi
           dandi-validations dispatch "${selection[@]}"
