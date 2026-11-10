@@ -8,7 +8,7 @@ The overview is in the [README](../README.md).
    Its resource owner is the `dandi-validations` organization, with access to all its repositories, so that it covers the repositories it creates.
    It needs these repository permissions, all read and write: Administration (to create repositories), Contents (to push the template), Workflows (to push workflow files) and Actions (to dispatch workflows).
 2. Run **Build and publish container**, then make the `dandi-validation` package public (Package settings → Change visibility), so that every repository's runner can pull it anonymously.
-3. Run **Make repositories** (try `dandiset_ids: 000006` first), then **Dispatch validations**.
+3. [Optional] Manually run **Make repositories** (e.g., `dandiset_ids: 000003`), then **Dispatch validations**.
 
 ## Command line
 
