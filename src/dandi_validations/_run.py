@@ -19,10 +19,11 @@ from ._branches import (
     prune_submodules,
     publish_capsule,
     register_submodule,
+    remote_heads,
     remote_url,
 )
 from ._capsule import Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
-from ._git import ensure_annex, push, repository_root, run
+from ._git import ensure_annex, pull, push, repository_root, run
 from ._globals import DEFAULT_BRANCH, DEFAULT_PARAMS_KEY
 
 _log = logging.getLogger(__name__)
@@ -103,7 +104,8 @@ def run_job(  # noqa: PLR0913
 
     The capsule's branch is checked out (or started) as a worktree of this clone, and its run is
     committed to it. Main's submodule for it is pinned to the result, both when the run is claimed
-    and when it is recorded. With ``push_to``, both branches are pushed at each point.
+    and when it is recorded. With ``push_to``, the clone is first rebased onto the remote's main,
+    and both branches are pushed at each point.
 
     Parameters
     ----------
@@ -140,6 +142,11 @@ def run_job(  # noqa: PLR0913
     root = repository_root(path)
     branch = branch or DEFAULT_BRANCH
     remote = push_to or "origin"
+    if push_to and branch in remote_heads(root=root, remote=push_to):
+        # A rerun checks out the commit its first attempt was dispatched at, as does a run queued
+        # behind another. Main's submodule may have been added since, which a rebase of the job's
+        # commit onto main could not merge.
+        pull(root=root, remote=push_to, branch=branch)
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
     ensure_annex(root=root, remote=None)
 
