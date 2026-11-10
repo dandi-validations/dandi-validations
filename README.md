@@ -9,7 +9,8 @@ Each run is recorded in a **capsule** per image, laid out after [DANDI Compute's
 The validation runs in a `dandi-validation` image that this repository mints on GHCR, tagged by its **validator version code** following the convention of [dandi/dandi-archive#2987](https://github.com/dandi/dandi-archive/pull/2987), e.g.
 `ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2`.
 
-This repository holds the container recipe, the orchestration code, the template of the Dandiset repositories, and the records collected from them (`records/`).
+This repository holds the container recipe, the orchestration code and the template of the Dandiset repositories.
+The records collected from them, a table of every capsule, live in [dandi-validations/dandi-validations-records](https://github.com/dandi-validations/dandi-validations-records), so that their commits stay out of this repository's history.
 
 ## Dandiset repositories
 
@@ -109,8 +110,10 @@ To update the image:
 | **Build and publish container** | Builds the image for the version code of `pixi.lock` and pushes the OCI image, its SIF and its lock to GHCR, unless that code is already published. |
 | **Make repositories** | Creates `https://github.com/dandi-validations/{dandiset_id}` for every non-empty, open Dandiset (DANDI API, falling back to listing S3) and syncs the template (`src/dandi_validations/repository_template/`) into the `main` of all of them. It can also dispatch their validation. It never touches capsule branches or submodules. |
 | **Dispatch validations** | Starts the Validate workflow of every (or the selected) Dandiset repository. |
-| **Collect records** | Every 6 hours, reads every capsule of every repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`. |
 | **Tests** | The tests, around one example (Dandiset 000006, see [`tests/README.md`](tests/README.md)). What its repository holds after a validation, branch by branch, is committed in `tests/expected_output/`, and one real job runs end to end and is compared with it. |
+
+The **Collect records** workflow runs in [dandi-validations/dandi-validations-records](https://github.com/dandi-validations/dandi-validations-records).
+Every 6 hours, it runs this repository's `dandi-validations collect`, which reads every capsule of every Dandiset repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`.
 
 ## Setting up
 
