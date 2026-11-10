@@ -4,7 +4,12 @@ The overview is in the [README](../README.md).
 
 ## Setting up
 
-1. Add the `_GITHUB_API_KEY` organization or repository secret, used only by **Make repositories** and **Dispatch validations**: a token that can create repositories in `dandi-validations`, push workflow files to them, and dispatch their workflows (a classic PAT with `repo` and `workflow`, or a fine-grained token with Administration, Contents, Workflows and Actions write access on the organization's repositories). Every other workflow, including each Dandiset repository's Validate workflow, uses the built-in `GITHUB_TOKEN`.
+1. Add the `_GITHUB_API_KEY` organization or repository secret, used only by **Make repositories** and **Dispatch validations**.
+   It must be a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token), which starts with `github_pat_`.
+   Classic tokens are refused.
+   Its resource owner is the `dandi-validations` organization, with access to all its repositories, so that it covers the repositories it creates.
+   It needs these repository permissions, all read and write: Administration (to create repositories), Contents (to push the template), Workflows (to push workflow files) and Actions (to dispatch workflows).
+   Every other workflow, including each Dandiset repository's Validate workflow, uses the built-in `GITHUB_TOKEN`.
 2. Run **Build and publish container**, then make the `dandi-validation` package public (Package settings → Change visibility), so that every repository's runner can pull it anonymously.
 3. Run **Make repositories** (try `dandiset_ids: 000006` first), then **Dispatch validations**.
 
@@ -20,7 +25,7 @@ dandi-validations prepare --dandiset 000006 --path /path/to/dataset   # form a c
 dandi-validations run --dandiset 000006 --push origin                 # what the Validate workflow runs
 dandi-validations ensure-repos --dandisets 000006 --ref main
 dandi-validations dispatch --dandisets 000006
-dandi-validations collect --output records
+dandi-validations collect --output records --tags                     # one table per image tag
 ```
 
 To run one job locally end to end (needs Docker and Apptainer, and `pip install ".[test]"`):

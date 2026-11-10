@@ -23,11 +23,23 @@ from ._repositories import (
 from ._run import run_job
 from ._version_code import VersionCodeError, build_version_code, versions_from_pixi_lock
 
+_FINE_GRAINED_PREFIX = "github_pat_"
+
 
 def _token() -> str:
-    token = os.environ.get("_GITHUB_API_KEY") or os.environ.get("GITHUB_TOKEN")
+    token = os.environ.get("_GITHUB_API_KEY")
+    if token:
+        if not token.startswith(_FINE_GRAINED_PREFIX):
+            message = (
+                "`_GITHUB_API_KEY` must be a fine-grained personal access token, which starts with "
+                f"`{_FINE_GRAINED_PREFIX}`. Classic tokens are not supported."
+            )
+            raise SystemExit(message)
+        return token
+    # The built-in token of GitHub Actions, enough to read the organization's public repositories.
+    token = os.environ.get("GITHUB_TOKEN")
     if not token:
-        message = "Set `_GITHUB_API_KEY` (or `GITHUB_TOKEN`) to a token that can administer the organization."
+        message = "Set `_GITHUB_API_KEY` to a fine-grained personal access token that can administer the organization."
         raise SystemExit(message)
     return token
 
@@ -127,6 +139,11 @@ def _build_parser() -> argparse.ArgumentParser:
     collect_parser = commands.add_parser("collect", help="Collect the capsules of every Dandiset repository.")
     _add_selection_arguments(parser=collect_parser, source=False)
     collect_parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path("records"))
+    collect_parser.add_argument(
+        "--tags",
+        action="store_true",
+        help="Write one table per image tag, each in a directory named by the tag.",
+    )
     return parser
 
 
@@ -206,6 +223,7 @@ def _collect(arguments: argparse.Namespace, /) -> int:
         dandiset_ids=_dandiset_ids(arguments=arguments, from_organization=True),
         output_directory=arguments.output,
         organization=arguments.organization,
+        by_tag=arguments.tags,
     )
     print("\n".join(str(path) for path in written))
     return 0

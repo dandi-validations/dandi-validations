@@ -4,9 +4,9 @@ name: Make repositories
 # syncs the managed files (the Validate workflow, README, dataset_description.json, ...) into
 # every one, as bids-dandisets/scripts does for its organization.
 #
-# Needs the `_GITHUB_API_KEY` secret: a token that can create repositories in the organization
-# and push workflow files to them (classic PAT scopes `repo` and `workflow`; or a
-# fine-grained token with Administration, Contents and Workflows write access).
+# Needs the `_GITHUB_API_KEY` secret: a fine-grained personal access token (classic tokens are
+# refused) for the organization's repositories, with Administration, Contents, Workflows and
+# Actions write access (see docs/README.md).
 
 on:
   workflow_dispatch:

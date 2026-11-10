@@ -81,3 +81,22 @@ def test_write_records(tmp_path: pathlib.Path) -> None:
     sidecar = json.loads((tmp_path / "records" / "capsules.json").read_text())
     assert set(sidecar) == set(CAPSULE_TABLE_COLUMNS)
     assert "Levels" in sidecar["status"]
+
+
+@pytest.mark.ai_generated
+def test_write_records_by_tag(tmp_path: pathlib.Path) -> None:
+    older = "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
+    newer = "d0.83.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
+    rows = [
+        {"dandiset_id": "000006", "capsule": f"pipeline-dandi+validate_tag-{older}", "status": "successful"},
+        {"dandiset_id": "000003", "capsule": f"pipeline-dandi+validate_tag-{older}", "status": "failed"},
+        {"dandiset_id": "000006", "capsule": f"pipeline-dandi+validate_tag-{newer}", "status": "stalled"},
+    ]
+    written = write_records(rows=rows, output_directory=tmp_path / "records", by_tag=True)
+    assert sorted(str(path.relative_to(tmp_path / "records")) for path in written) == sorted(
+        f"{tag}/{name}" for tag in (older, newer) for name in ("capsules.tsv", "capsules.json")
+    )
+    older_table = read_capsule_table((tmp_path / "records" / older / "capsules.tsv").read_bytes())
+    assert [row["dandiset_id"] for row in older_table] == ["000003", "000006"]
+    newer_table = read_capsule_table((tmp_path / "records" / newer / "capsules.tsv").read_bytes())
+    assert [row["status"] for row in newer_table] == ["stalled"]

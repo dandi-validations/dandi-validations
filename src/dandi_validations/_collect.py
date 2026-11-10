@@ -11,7 +11,7 @@ import pathlib
 import subprocess
 import tempfile
 
-from ._capsule import list_capsules
+from ._capsule import CAPSULE_NAME_RE, list_capsules
 from ._capsule_table import capsule_row, capsule_table_bytes, capsule_table_sidecar_bytes
 from ._globals import ORGANIZATION
 
@@ -86,23 +86,7 @@ def collect_repository(
     return [capsule_row(capsule) for capsule in list_capsules(main)]
 
 
-def write_records(*, rows: list[dict], output_directory: pathlib.Path) -> list[pathlib.Path]:
-    """
-    Write the capsule table and its sidecar.
-
-    Parameters
-    ----------
-    rows : list[dict]
-        The capsule rows.
-    output_directory : pathlib.Path
-        Where to write ``capsules.tsv`` and ``capsules.json``.
-
-    Returns
-    -------
-    list[pathlib.Path]
-        The files written.
-
-    """
+def _write_table(*, rows: list[dict], output_directory: pathlib.Path) -> list[pathlib.Path]:
     output_directory.mkdir(parents=True, exist_ok=True)
     rows = sorted(rows, key=lambda row: (row.get("dandiset_id", ""), row["capsule"]))
     contents = {"capsules.tsv": capsule_table_bytes(rows), "capsules.json": capsule_table_sidecar_bytes()}
@@ -114,16 +98,52 @@ def write_records(*, rows: list[dict], output_directory: pathlib.Path) -> list[p
     return written
 
 
-def collect(
+def _capsule_tag(row: dict, /) -> str:
+    match = CAPSULE_NAME_RE.fullmatch(row["capsule"])
+    return match.group("tag") if match else row.get("version") or "unknown"
+
+
+def write_records(*, rows: list[dict], output_directory: pathlib.Path, by_tag: bool = False) -> list[pathlib.Path]:
+    """
+    Write the capsule table and its sidecar.
+
+    Parameters
+    ----------
+    rows : list[dict]
+        The capsule rows.
+    output_directory : pathlib.Path
+        Where to write ``capsules.tsv`` and ``capsules.json``.
+    by_tag : bool, default=False
+        Whether to write one table per image tag instead, each in a directory named by the tag.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        The files written.
+
+    """
+    if not by_tag:
+        return _write_table(rows=rows, output_directory=output_directory)
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        groups.setdefault(_capsule_tag(row), []).append(row)
+    written = []
+    for tag, tag_rows in sorted(groups.items()):
+        written += _write_table(rows=tag_rows, output_directory=output_directory / tag)
+    return written
+
+
+def collect(  # noqa: PLR0913
     *,
     dandiset_ids: list[str],
     output_directory: pathlib.Path,
     organization: str = ORGANIZATION,
     clone_url_template: str = DEFAULT_CLONE_URL_TEMPLATE,
     workers: int = 8,
+    by_tag: bool = False,
 ) -> list[pathlib.Path]:
     """
-    Tabulate the capsules of many Dandiset repositories into one capsule table.
+    Tabulate the capsules of many Dandiset repositories into one capsule table, or one per image tag.
 
     Parameters
     ----------
@@ -137,6 +157,9 @@ def collect(
         The repositories' URL, with ``{organization}`` and ``{repository}`` fields.
     workers : int, default=8
         How many repositories to read at once.
+    by_tag : bool, default=False
+        Whether to write one table per image tag, each in a directory of ``output_directory`` named
+        by the tag.
 
     Returns
     -------
@@ -159,4 +182,4 @@ def collect(
                 ),
             )
     rows = [row for table in tables for row in table]
-    return write_records(rows=rows, output_directory=output_directory)
+    return write_records(rows=rows, output_directory=output_directory, by_tag=by_tag)

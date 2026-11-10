@@ -113,7 +113,9 @@ To update the image:
 | **Tests** | The tests, around one example (Dandiset 000006, see [`tests/README.md`](tests/README.md)). What its repository holds after a validation, branch by branch, is committed in `tests/expected_output/`, and one real job runs end to end and is compared with it. |
 
 The **Collect records** workflow runs in [dandi-validations/dandi-validations-records](https://github.com/dandi-validations/dandi-validations-records).
-Every 6 hours, it runs this repository's `dandi-validations collect`, which reads every capsule of every Dandiset repository (through `main`'s submodules) into `records/capsules.tsv`, one row per Dandiset and image, described by `records/capsules.json`.
+Every 6 hours, it runs this repository's `dandi-validations collect --tags`, which reads every capsule of every Dandiset repository through `main`'s submodules.
+Each image's records go to the branch of that repository named by the image's tag: `capsules.tsv`, one row per Dandiset, described by `capsules.json`.
+Its `main` holds only the workflow.
 
 ## Setting up, the command line and development
 

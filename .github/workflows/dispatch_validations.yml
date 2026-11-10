@@ -2,7 +2,8 @@ name: Dispatch validations
 
 # Starts the Validate workflow of Dandiset repositories (all of them by default). Each runs on
 # its own GitHub Actions runner and skips quickly when its Dandiset has not changed since its
-# last successful job. Needs the `_GITHUB_API_KEY` secret (Actions write access to the repositories).
+# last successful job. Needs the `_GITHUB_API_KEY` secret, a fine-grained personal access token with
+# Actions write access to the repositories (see docs/README.md).
 
 on:
   workflow_dispatch:
