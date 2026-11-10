@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" viewBox="0 0 545 545" width="545" height="545">
+  <title>Magnifier lens</title>
+  <g id="magnifier" inkscape:groupmode="layer" inkscape:label="magnifier">
+    <path id="handle-outline" fill="none" stroke="#344453" stroke-width="58" stroke-linecap="round" d="M420,390 L488,458"/>
+    <path id="handle-face" fill="none" stroke="#5C6A77" stroke-width="38" stroke-linecap="round" d="M420,390 L488,458"/>
+    <path id="collar-outline" fill="none" stroke="#344453" stroke-width="70" d="M400,370 L428,398"/>
+    <path id="collar-face" fill="none" stroke="#AAB2BD" stroke-width="52" d="M404,374 L424,394"/>
+    <circle id="glass" fill="#DCEBF5" fill-opacity="0.35" cx="316" cy="286" r="100"/>
+    <circle id="ring-outline" fill="none" stroke="#344453" stroke-width="34" cx="316" cy="286" r="116"/>
+    <circle id="ring-face" fill="none" stroke="#AAB2BD" stroke-width="18" cx="316" cy="286" r="116"/>
+    <path id="glint" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="12" stroke-linecap="round" d="M247,261 A74,74 0 0 1 279,222"/>
+  </g>
+</svg>
