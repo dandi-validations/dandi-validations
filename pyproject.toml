@@ -17,6 +17,7 @@ dependencies = [
     "datalad-container >= 1.2.5",
     "con-duct >= 0.13",
     "git-annex",
+    "jinja2 >= 3.1",
     "requests >= 2.28",
 ]
 

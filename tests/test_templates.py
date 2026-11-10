@@ -1,4 +1,5 @@
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -7,11 +8,11 @@ from dandi_validations import TEMPLATES_DIRECTORY, render_repository_template, r
 
 
 @pytest.mark.ai_generated
-def test_render_substitutes_and_leaves_github_expressions() -> None:
-    template = "id={{ dandiset_id }} ref=${{ inputs.ref }} again={{dandiset_id}}"
+def test_render_substitutes_and_keeps_raw_github_expressions() -> None:
+    template = "id={{ dandiset_id }} ref={% raw %}${{ inputs.ref }}{% endraw %} again={{dandiset_id}}\n"
     assert template_placeholders(template) == {"dandiset_id"}
     rendered = render_template(template=template, dandiset_id="000006")
-    assert rendered == "id=000006 ref=${{ inputs.ref }} again=000006"
+    assert rendered == "id=000006 ref=${{ inputs.ref }} again=000006\n"
 
 
 @pytest.mark.ai_generated
@@ -20,6 +21,8 @@ def test_render_substitutes_and_leaves_github_expressions() -> None:
     [
         ("{{ a }} {{ b }}", {"a": 1}, "No value"),
         ("{{ a }}", {"a": 1, "b": 2}, "does not have"),
+        # A GitHub Actions expression outside {% raw %} is read as a variable.
+        ("ref=${{ inputs.ref }}", {}, "No value"),
     ],
 )
 def test_render_requires_exact_values(template: str, values: dict, message: str) -> None:
@@ -36,7 +39,7 @@ def test_repository_template_renders_completely() -> None:
         "README.md",
         "dataset_description.json",
     }
-    unrendered = {path for path, content in files.items() if template_placeholders(content.decode())}
+    unrendered = {path for path, content in files.items() if re.search(r"(?<!\$)\{\{|\{%", content.decode())}
     assert unrendered == set()
     workflow = files[".github/workflows/validate.yml"].decode()
     assert "uses: dandi-validations/dandi-validations/.github/actions/setup@main" in workflow

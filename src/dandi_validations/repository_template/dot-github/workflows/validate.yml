@@ -44,8 +44,8 @@ jobs:
 
       - name: Validate Dandiset {{ dandiset_id }}
         env:
-          DANDISET_VERSION: ${{ inputs.dandiset_version || 'draft' }}
-          FORCE: ${{ inputs.force && '--force' || '' }}
+          DANDISET_VERSION: {% raw %}${{ inputs.dandiset_version || 'draft' }}{% endraw %}
+          FORCE: {% raw %}${{ inputs.force && '--force' || '' }}{% endraw %}
         run: |
           dandi-validations run \
             --dandiset {{ dandiset_id }} \

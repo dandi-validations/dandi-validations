@@ -1,13 +1,24 @@
-"""Fill ``{{ name }}`` placeholders, leaving GitHub Actions expressions (``${{ ... }}``) alone."""
+"""
+Render the Jinja2 templates of the Dandiset repositories and the job capsules.
 
-import re
+GitHub Actions expressions (``${{ ... }}``) in a template are wrapped in ``{% raw %}``, so that
+they are kept as they are.
+"""
 
-_PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+import jinja2
+import jinja2.meta
+
+# The templates are Markdown, JSON, YAML and shell, not HTML, so nothing is escaped.
+_ENVIRONMENT = jinja2.Environment(
+    autoescape=False,  # noqa: S701
+    keep_trailing_newline=True,
+    undefined=jinja2.StrictUndefined,
+)
 
 
 def template_placeholders(template: str, /) -> set[str]:
     """
-    List the names of the placeholders in a template.
+    List the names of the variables in a template.
 
     Parameters
     ----------
@@ -17,25 +28,26 @@ def template_placeholders(template: str, /) -> set[str]:
     Returns
     -------
     set[str]
-        The name of every ``{{ name }}`` placeholder.
+        The name of every variable the template reads, such as ``dandiset_id`` in
+        ``{{ dandiset_id }}``.
 
     """
-    return set(_PLACEHOLDER_RE.findall(template))
+    return jinja2.meta.find_undeclared_variables(_ENVIRONMENT.parse(template))
 
 
 def render_template(*, template: str, **values: object) -> str:
     """
-    Substitute every ``{{ name }}`` placeholder of a template.
+    Render a template.
 
-    Every placeholder must be given a value and every value must be used. That way a template and
-    the code that fills it cannot drift apart silently.
+    Every variable must be given a value and every value must be used. That way a template and the
+    code that fills it cannot drift apart silently.
 
     Parameters
     ----------
     template : str
         The text of the template.
     **values : object
-        The value of each placeholder, by name.
+        The value of each variable, by name.
 
     Returns
     -------
@@ -45,16 +57,16 @@ def render_template(*, template: str, **values: object) -> str:
     Raises
     ------
     KeyError
-        If a placeholder has no value, or a value has no placeholder.
+        If a variable has no value, or a value has no variable.
 
     """
     names = template_placeholders(template)
     missing = names - values.keys()
     if missing:
-        message = f"No value given for template placeholders: {sorted(missing)}."
+        message = f"No value given for template variables: {sorted(missing)}."
         raise KeyError(message)
     unused = values.keys() - names
     if unused:
-        message = f"Values given for placeholders the template does not have: {sorted(unused)}."
+        message = f"Values given for variables the template does not have: {sorted(unused)}."
         raise KeyError(message)
-    return _PLACEHOLDER_RE.sub(lambda match: str(values[match.group(1)]), template)
+    return _ENVIRONMENT.from_string(template).render(**values)
