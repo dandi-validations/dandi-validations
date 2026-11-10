@@ -34,6 +34,8 @@ CAPSULE_GITATTRIBUTES = (
     "* annex.largefiles=nothing\n"
     "# The image is annexed: only its key is recorded; its content is published on GHCR.\n"
     "envs/** annex.largefiles=anything\n"
+    "# The summary only counts what validation.jsonl holds, so GitHub collapses it in diffs.\n"
+    "derivatives/validation_summary.txt linguist-generated=true\n"
 )
 CAPSULE_GITIGNORE = "intermediate/\n"
 SOURCEDATA = "sourcedata"
