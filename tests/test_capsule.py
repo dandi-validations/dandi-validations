@@ -69,7 +69,7 @@ def _complete(capsule: Capsule, /) -> None:
     capsule.logs_directory.mkdir(exist_ok=True)
     (capsule.logs_directory / "run.json").write_text("{}")
     capsule.derivatives_directory.mkdir()
-    (capsule.derivatives_directory / "summary.json").write_text("{}")
+    (capsule.derivatives_directory / "validation.jsonl").write_text("")
 
 
 @pytest.mark.ai_generated

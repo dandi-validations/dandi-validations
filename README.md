@@ -30,10 +30,10 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
 └── pipeline-dandi+validate_tag-{tag}/  ← submodule: branch {tag} of this repository
     ├── dataset_description.json  ← a study dataset: the provenance of its latest run
     ├── code/  ← assets.tsv, dandiset.yaml, name-default.json, run.sh,
-    │            summarize.py, submit.sh, submitted_date-... (claim marker)
+    │            submit.sh, submitted_date-... (claim marker)
     ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
     │            container_versions.json, run.json, submit.log
-    ├── derivatives/  ← validation.jsonl (sorted by file, then issue), summary.json (plain text)
+    ├── derivatives/  ← validation.jsonl, as `dandi validate` writes it (plain text)
     ├── envs/dandi-validation/image  ← the image's registration (annexed, with its content on GHCR)
     └── sourcedata/  ← subdataset: https://github.com/dandisets/{dandiset_id} at its draft head
 ```

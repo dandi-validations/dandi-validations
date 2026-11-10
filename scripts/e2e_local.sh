@@ -112,7 +112,7 @@ assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] =
 # The branch named by the tag: the capsule at its root (a study dataset), its image's registration
 # and its run record.
 files = set(git("ls-tree", "-r", "--name-only", code).split())
-assert {"envs/dandi-validation/image", "code/submit.sh", "derivatives/summary.json", "sourcedata"} <= files
+assert {"envs/dandi-validation/image", "code/submit.sh", "derivatives/validation.jsonl", "sourcedata"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") for path in files), files
 assert json.loads(git("show", f"{code}:dataset_description.json"))["DatasetType"] == "study"
@@ -128,10 +128,9 @@ assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] =
 assert provenance["sourcedata"]["commit"] == sourcedata[2], provenance["sourcedata"]
 row = capsule_row(capsule)
 assert row["status"] == "successful", row
-summary = json.loads((capsule / "derivatives" / "summary.json").read_text())
-assert summary["files_streamed"] == row["assets"], (summary["files_streamed"], row["assets"])
-assert summary["files_missing_content"] == 0, summary
-print(json.dumps({key: summary[key] for key in ("total_results", "by_severity", "by_validator")}, indent=2))
+assert row["files_streamed"] == row["assets"], (row["files_streamed"], row["assets"])
+assert row["files_missing_content"] == 0, row
+print(json.dumps({key: row[key] for key in ("total_results", "critical", "error", "warning", "hint", "info")}, indent=2))
 EOF
 
 git -C "$REMOTE" log --oneline main | head -n 5

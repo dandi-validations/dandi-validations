@@ -254,12 +254,19 @@ def _normalize_log(*, path: str, text: str) -> str:
     return json.dumps(content, indent=2) + "\n"
 
 
+def _sort_results(text: str, /) -> str:
+    """Order results by file, then issue ID, since ``dandi validate --jobs`` writes them as its workers finish."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    keys = {line: (json.loads(line).get("path") or "", json.loads(line).get("id") or "", line) for line in lines}
+    return "".join(line + "\n" for line in sorted(lines, key=keys.__getitem__))
+
+
 def materialize(*, repository: pathlib.Path, ref: str, destination: pathlib.Path, names: dict[str, str]) -> None:
     """
     Write the files of a ref as GitHub shows them.
 
     Files hold their content, symbolic links show as ``-> target``, and submodules as
-    ``Subproject commit <commit>``. JSON logs are indented.
+    ``Subproject commit <commit>``. JSON logs are indented, and results sorted.
     """
     output = git("ls-tree", "-r", "-z", ref, cwd=repository)
     for entry in filter(None, output.split("\0")):
@@ -274,6 +281,8 @@ def materialize(*, repository: pathlib.Path, ref: str, destination: pathlib.Path
         content = normalize(text=content, names=names)
         if path.startswith("logs/") and path.endswith(".json"):
             content = _normalize_log(path=path, text=content)
+        if path == "derivatives/validation.jsonl":
+            content = _sort_results(content)
         target = destination / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)

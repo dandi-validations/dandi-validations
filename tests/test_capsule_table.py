@@ -27,17 +27,15 @@ def _successful_capsule(*, root: pathlib.Path, assets_jsonld: bytes, dandiset_ya
         json.dumps({"execution_summary": {"wall_clock_time": 41.948, "peak_rss": 1925668864}}),
     )
     capsule.derivatives_directory.mkdir()
-    (capsule.derivatives_directory / "summary.json").write_text(
-        json.dumps(
-            {
-                "dandi_validate_exit_code": 1,
-                "total_results": 946,
-                "by_severity": {"CRITICAL": 0, "ERROR": 576, "WARNING": 317, "HINT": 0, "INFO": 53},
-                "files_streamed": 2,
-                "files_missing_content": 0,
-                "files_with_issues": 2,
-            },
-        ),
+    results = [
+        {"id": "DANDI.FILE_CONTENT_STREAMED", "severity": "INFO", "path": "sub-01/a.nwb"},
+        {"id": "DANDI.FILE_CONTENT_STREAMED", "severity": "INFO", "path": "sub-02/b.nwb"},
+        {"id": "NWBI.check_subject_age", "severity": "ERROR", "path": "sub-01/a.nwb"},
+        {"id": "pynwb.x", "severity": "ERROR", "path": "sub-01/a.nwb"},
+        {"id": "NWBI.check_units_resolution_is_set", "severity": "WARNING", "path": "sub-02/b.nwb"},
+    ]
+    (capsule.derivatives_directory / "validation.jsonl").write_text(
+        "".join(json.dumps(result) + "\n" for result in results),
     )
     return capsule
 
@@ -52,8 +50,15 @@ def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandise
         "status": "successful",
         "dandiset_id": "000123",
         "version": capsule.tag,
-        "error": 576,
-        "warning": 317,
+        "total_results": 5,
+        "critical": 0,
+        "error": 2,
+        "warning": 1,
+        "hint": 0,
+        "info": 2,
+        "files_streamed": 2,
+        "files_missing_content": 0,
+        "files_with_issues": 2,
         "wall_clock_seconds": 41.9,
         "assets": 2,
         "skipped_assets": 2,

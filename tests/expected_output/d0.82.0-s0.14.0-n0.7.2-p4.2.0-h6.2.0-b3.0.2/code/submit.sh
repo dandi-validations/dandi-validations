@@ -112,7 +112,6 @@ duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "pipeline-d
         --explicit \
         --message "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset ${DANDISET_ID} (draft)" \
         --input "${CAPSULE}/code/run.sh" \
-        --input "${CAPSULE}/code/summarize.py" \
         --input "${CAPSULE}/code/name-default.json" \
         --input "${CAPSULE}/code/dandiset.yaml" \
         --input "${CAPSULE}/code/assets.tsv" \

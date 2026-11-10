@@ -21,7 +21,9 @@ branch:
   - `logs/` holds duct's records (`duct_info.json`, `duct_usage.jsonl`, `duct_stdout`,
     `duct_stderr`), the image's versions (`container_versions.json`), the run's record (`run.json`)
     and the output of `submit.sh` (`submit.log`).
-  - `derivatives/` holds the results, `summary.json` and every result in `validation.jsonl`.
+  - `derivatives/` holds every result in `validation.jsonl`.
+    `dandi validate` writes them in whatever order its workers finish, so they are compared sorted by file, then issue.
+    Its `--summary` lands in `logs/duct_stderr`.
   - `sourcedata` links DANDI's DataLad mirror of the Dandiset.
   - `envs/` registers the image.
 

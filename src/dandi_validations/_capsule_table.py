@@ -5,6 +5,7 @@ The collect step builds this table for every Dandiset repository of the organiza
 repository's ``records/capsules.tsv``. A BIDS-style ``capsules.json`` sidecar describes its columns.
 """
 
+import collections
 import json
 import pathlib
 
@@ -29,7 +30,6 @@ CAPSULE_TABLE_COLUMNS = {
     "run_exit_code": "Exit code of the run (0 for a completed validation, whatever it found).",
     "wall_clock_seconds": "Wall-clock time of `datalad containers-run`, measured by duct.",
     "peak_rss_bytes": "Peak resident memory of the run's process tree, measured by duct.",
-    "dandi_validate_exit_code": "Exit code of `dandi validate` itself (1 when it reported errors).",
     "total_results": "Number of validation results recorded.",
     "critical": "Results of severity CRITICAL.",
     "error": "Results of severity ERROR.",
@@ -41,14 +41,10 @@ CAPSULE_TABLE_COLUMNS = {
     "files_with_issues": "Files with at least one CRITICAL, ERROR or WARNING result.",
 }
 
-_SUMMARY_COLUMNS = (
-    "dandi_validate_exit_code",
-    "total_results",
-    "files_streamed",
-    "files_missing_content",
-    "files_with_issues",
-)
-_SEVERITY_COLUMNS = ("critical", "error", "warning", "hint", "info")
+_SEVERITIES = ("CRITICAL", "ERROR", "WARNING", "HINT", "INFO")
+_ISSUE_SEVERITIES = {"CRITICAL", "ERROR", "WARNING"}
+_STREAMED_ID = "DANDI.FILE_CONTENT_STREAMED"
+_MISSING_ID = "DANDI.FILE_CONTENT_MISSING"
 
 
 def _read_json(file_path: pathlib.Path, /) -> dict:
@@ -60,6 +56,32 @@ def _read_json(file_path: pathlib.Path, /) -> dict:
         return {}
 
 
+def _count_results(results_file: pathlib.Path, /) -> dict[str, int]:
+    if not results_file.exists():
+        return {}
+    severities: collections.Counter[str] = collections.Counter()
+    issue_ids: collections.Counter[str] = collections.Counter()
+    files_with_issues = set()
+    with results_file.open() as stream:
+        for line in stream:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            severity = record.get("severity") or "NONE"
+            severities[severity] += 1
+            issue_ids[record.get("id") or ""] += 1
+            if severity in _ISSUE_SEVERITIES and record.get("path"):
+                files_with_issues.add(record["path"])
+    counts = {
+        "total_results": severities.total(),
+        "files_streamed": issue_ids[_STREAMED_ID],
+        "files_missing_content": issue_ids[_MISSING_ID],
+        "files_with_issues": len(files_with_issues),
+    }
+    counts.update({severity.lower(): severities[severity] for severity in _SEVERITIES})
+    return counts
+
+
 def _claimed_by(capsule_directory: pathlib.Path, /) -> str:
     markers = sorted((capsule_directory / "code").glob(f"{SUBMITTED_MARKER_PREFIX}*"))
     return markers[0].read_text().strip() if markers else ""
@@ -68,6 +90,8 @@ def _claimed_by(capsule_directory: pathlib.Path, /) -> str:
 def capsule_row(capsule_directory: pathlib.Path, /) -> dict:
     """
     Tabulate a capsule from its provenance, logs and results.
+
+    The counts of results are read from ``derivatives/validation.jsonl``.
 
     Parameters
     ----------
@@ -83,8 +107,6 @@ def capsule_row(capsule_directory: pathlib.Path, /) -> dict:
     provenance = read_provenance(capsule_directory)
     duct_summary = _read_json(capsule_directory / "logs" / "duct_info.json").get("execution_summary", {})
     run = _read_json(capsule_directory / "logs" / "run.json")
-    summary = _read_json(capsule_directory / "derivatives" / "summary.json")
-    by_severity = summary.get("by_severity", {})
 
     row: dict[str, object] = dict.fromkeys(CAPSULE_TABLE_COLUMNS, "")
     row.update({key: provenance[key] for key in CAPSULE_TABLE_COLUMNS if key in provenance})
@@ -95,10 +117,7 @@ def capsule_row(capsule_directory: pathlib.Path, /) -> dict:
     if duct_summary.get("wall_clock_time") is not None:
         row["wall_clock_seconds"] = round(float(duct_summary["wall_clock_time"]), 1)
     row["peak_rss_bytes"] = duct_summary.get("peak_rss", "")
-    for key in _SUMMARY_COLUMNS:
-        row[key] = summary.get(key, "")
-    for severity in _SEVERITY_COLUMNS:
-        row[severity] = by_severity.get(severity.upper(), "")
+    row.update(_count_results(capsule_directory / "derivatives" / "validation.jsonl"))
     return row
 
 

@@ -109,7 +109,7 @@ def test_reruns_skip_unchanged_inputs_and_add_to_the_branch(
 
     # Record a successful run, as a job does after the container exits.
     capsule.derivatives_directory.mkdir()
-    (capsule.derivatives_directory / "summary.json").write_text("{}")
+    (capsule.derivatives_directory / "validation.jsonl").write_text("")
     commit_and_publish(
         main_root=world.runner,
         capsule=capsule,

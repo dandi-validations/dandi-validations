@@ -688,8 +688,7 @@ def _write_code(  # noqa: PLR0913
     (code_directory / "dandiset.yaml").write_bytes(dandiset_yaml)
     params_file_path = code_directory / parameters.file_path.name
     shutil.copyfile(parameters.file_path, params_file_path)
-    for name in ("run.sh", "summarize.py"):
-        shutil.copyfile(CAPSULE_CODE_DIRECTORY / name, code_directory / name)
+    shutil.copyfile(CAPSULE_CODE_DIRECTORY / "run.sh", code_directory / "run.sh")
 
     submit_script = render_template(
         template=(TEMPLATES_DIRECTORY / "submit.sh").read_text(),
