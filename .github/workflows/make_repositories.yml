@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       dandiset_ids:
-        description: Comma-separated Dandiset IDs, e.g. 000003,000004 (default, all of them)
+        description: Comma-separated Dandiset IDs (default, all of them)
         type: string
         default: ""
       limit:
@@ -20,10 +20,7 @@ on:
         type: string
         default: ""
       codebase_ref:
-        description: >-
-          Branch, tag, or full 40-character commit SHA of this repository that the Dandiset
-          repositories' workflows use. A short SHA does not work. A branch is followed to its latest
-          commit on every run, while a commit SHA pins them.
+        description: Version of dandi-validations the Dandiset repositories run (branch, tag, or full SHA)
         type: string
         default: main
       dispatch:
