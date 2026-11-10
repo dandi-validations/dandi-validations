@@ -19,7 +19,7 @@ on:
         description: At most this many Dandisets (default, no limit)
         type: string
         default: ""
-      codebase_ref:
+      branch_or_commit:
         description: Branch name or commit hash
         type: string
         default: main
@@ -45,7 +45,7 @@ jobs:
       _GITHUB_API_KEY: ${{ secrets._GITHUB_API_KEY }}
       DANDISET_IDS: ${{ inputs.dandiset_ids }}
       LIMIT: ${{ inputs.limit }}
-      CODEBASE_REF: ${{ inputs.codebase_ref || 'main' }}
+      CODEBASE_REF: ${{ inputs.branch_or_commit || 'main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
