@@ -14,10 +14,11 @@ Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its
         ├── envs/  ← the image's registration
         └── sourcedata/  ← subdataset linking DANDI's DataLad mirror of the Dandiset
 
-``{tag}`` is the dandi-validation image's tag, which is its validator version code. Each capsule
-is a DataLad dataset on the branch named by that tag. It holds the latest validation of the
-Dandiset with that image. A new run with the same image replaces its contents in a new commit on
-the branch, so earlier runs remain in the branch's history, each with its ``datalad run`` record.
+``{tag}`` is the dandi-validation image's tag (its validator version code), followed by ``-v`` and
+the version of dandi-validations that formed the capsule. Each capsule is a DataLad dataset on the
+branch named by that tag. It holds the latest validation of the Dandiset with that image and that
+version of this code. A new run with both unchanged replaces its contents in a new commit on the
+branch, so earlier runs remain in the branch's history, each with its ``datalad run`` record.
 
 A capsule's lifecycle status is read from what it contains, as DANDI Compute does. It is
 ``pending`` with code only, ``stalled`` when submitted but nothing was logged, ``failed`` with logs
@@ -26,7 +27,6 @@ but no results, and ``successful`` with results under ``derivatives/``.
 
 import dataclasses
 import datetime
-import importlib.metadata
 import json
 import os
 import pathlib
@@ -100,7 +100,7 @@ class Capsule:
     pipeline : str
         The pipeline's name.
     tag : str
-        The image's tag, which is also the name of the capsule's branch.
+        The image's tag, then ``-v`` and the version of dandi-validations. It also names the capsule's branch.
 
     """
 
@@ -237,11 +237,7 @@ def capsule_status(capsule_directory: pathlib.Path, /) -> str:
     return "unknown"
 
 
-def _codebase_version() -> str:
-    try:
-        version = importlib.metadata.version("dandi-validations")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
+def _codebase_version(version: str, /) -> str:
     commit = os.environ.get("DANDI_VALIDATIONS_CODEBASE_COMMIT")
     if not commit:
         try:
@@ -443,7 +439,7 @@ def plan_capsule(  # noqa: PLR0913
     dandiset_yaml: bytes | None = None,
 ) -> CapsulePlan | str:
     """
-    Read a Dandiset's manifest and work out the capsule of the pinned image.
+    Read a Dandiset's manifest and work out the capsule of the pinned image and this code's version.
 
     The inputs that identify a run are the Dandiset version, the image's version code, the
     parameter set, and the digest of the Dandiset's registered assets and metadata.
@@ -496,7 +492,7 @@ def plan_capsule(  # noqa: PLR0913
         repository_root=repository_root,
         dandiset_id=dandiset_id,
         pipeline=pipeline.pipeline,
-        tag=inputs["version"],
+        tag=pipeline.tag,
     )
     return CapsulePlan(
         capsule=capsule,
@@ -576,7 +572,7 @@ def write_capsule(
         skipped_table=plan.skipped_table,
         now=now,
     )
-    codebase_version = _codebase_version()
+    codebase_version = _codebase_version(pipeline.codebase_version)
     provenance = {
         "dandiset_id": capsule.dandiset_id,
         **plan.inputs,

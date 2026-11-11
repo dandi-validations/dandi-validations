@@ -142,7 +142,7 @@ def _build_parser() -> argparse.ArgumentParser:
     collect_parser.add_argument(
         "--tags",
         action="store_true",
-        help="Write one table per image tag, each in a directory named by the tag.",
+        help="Write one table per capsule tag, each in a directory named by the tag.",
     )
     return parser
 

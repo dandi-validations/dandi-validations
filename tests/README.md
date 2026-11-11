@@ -12,7 +12,7 @@ Jobs read it instead of S3 (`dandi-validations run --manifest ...`).
 It has one directory per branch:
 
 - [`main/`](expected_output/main) is the derivative dataset, with the capsule's submodule.
-- [`d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2/`](expected_output/d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2) is the capsule's branch, named by the image's tag. It is a study dataset with these side by side:
+- [`d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0/`](expected_output/d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0) is the capsule's branch, named by the image's tag and the version of dandi-validations. It is a study dataset with these side by side:
   - `code/` holds the capsule's code and inputs.
   - `logs/` holds duct's records (`duct_info.json`, `duct_usage.jsonl`, `duct_stdout`, `duct_stderr`), the image's versions (`container_versions.json`), the run's record (`run.json`) and the output of `submit.sh` (`submit.log`).
   - `derivatives/` holds every result in `validation.jsonl`, and their counts by severity, validator and standard in `validation_summary.txt` (`dandi validate --summary`).
@@ -55,6 +55,7 @@ The rest is fixed in [`test_expected_output.py`](test_expected_output.py):
 The stand-in mirror has one `draft` commit holding the example's `dandiset.yaml`.
 
 To regenerate the expected output after an intended change, run the following and review the diff before committing it.
+A version bump renames the capsule's branch, so first rename its directory here and `main/`'s submodule file with `git mv`.
 Without the image, the first command updates everything but the run's outputs.
 
 ```bash

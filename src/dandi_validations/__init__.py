@@ -4,12 +4,14 @@ Validate every Dandiset on its own GitHub Actions runner and record each run as 
 Each Dandiset gets a repository, ``dandi-validations/{dandiset_id}``, whose runner validates it
 with streaming ``dandi validate`` in the ``dandi-validation`` image (dandi/dandi-cli#1956). Each
 run is recorded in a capsule on the branch named by the image's validator version code
-(dandi/dandi-archive#2987), and ``main`` holds a submodule for each capsule branch.
+(dandi/dandi-archive#2987) and the version of dandi-validations, and ``main`` holds a submodule
+for each capsule branch.
 
 - ``run_job`` validates a Dandiset in a clone of its repository, as its Validate workflow does.
 - ``prepare_capsule`` and ``capsule_status`` form and read capsules.
 - ``ensure_repositories``, ``dispatch_validations`` and ``collect`` manage the repositories.
-- ``build_version_code`` and ``parse_version_code`` handle the images' tags.
+- ``build_version_code`` and ``parse_version_code`` handle the images' tags, and
+  ``build_capsule_tag`` the capsules' tags.
 """
 
 from ._branches import capsule_branches, checkout_capsule, prune_submodules, remote_heads
@@ -39,6 +41,7 @@ from ._templates import render_template, template_placeholders
 from ._version_code import (
     VALIDATOR_CODES,
     VersionCodeError,
+    build_capsule_tag,
     build_version_code,
     parse_version_code,
     semantic_version,
@@ -58,6 +61,7 @@ __all__ = [
     "PrepareResult",
     "VersionCodeError",
     "assets_table_bytes",
+    "build_capsule_tag",
     "build_version_code",
     "capsule_branches",
     "capsule_row",

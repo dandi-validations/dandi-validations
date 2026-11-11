@@ -32,6 +32,8 @@ read_pin() {
 IMAGE="$(read_pin container.image)"
 CODE="$(read_pin container.version)"
 NAME="$(read_pin container.name)"
+# The capsule's branch: the version code, then the version of dandi-validations.
+TAG="$(python -c 'from dandi_validations import load_pipeline; print(load_pipeline().tag)')"
 
 LOCKED_CODE="$(dandi-validations version-code --lock "${CONTAINER_DIRECTORY}/pixi.lock")"
 if [ "$LOCKED_CODE" != "$CODE" ]; then
@@ -61,7 +63,7 @@ if [ -d "${REPOSITORY_ROOT}/tests/example_dandiset/${DANDISET_ID}" ]; then
     status=0
     DANDI_VALIDATIONS_ACTUAL_OUTPUT="$ACTUAL" python -m pytest -m container -v -rs tests/test_expected_output.py \
         | tee "${WORK_DIRECTORY}/pytest.log" || status=$?
-    for log in "${ACTUAL}/${CODE}/logs/"*; do
+    for log in "${ACTUAL}/${TAG}/logs/"*; do
         echo "::group::logs/$(basename "$log")"
         cat "$log"
         echo "::endgroup::"
@@ -92,36 +94,36 @@ git clone --quiet "$REMOTE" "$CLONE"
 cd "$CLONE"
 dandi-validations run --dandiset "$DANDISET_ID" --push origin --timeout 60
 
-python - "$IMAGE" "$CODE" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
+python - "$IMAGE" "$CODE" "$TAG" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
 import json, pathlib, subprocess, sys
 
 from dandi_validations import capsule_row, read_provenance
 
-image, code, digest, remote = sys.argv[1:]
+image, code, tag, digest, remote = sys.argv[1:]
 
 
 def git(*arguments):
     return subprocess.run(["git", "-C", remote, *arguments], capture_output=True, text=True, check=True).stdout
 
 
-name = f"pipeline-dandi+validate_tag-{code}"
+name = f"pipeline-dandi+validate_tag-{tag}"
 # main: the derivative dataset, and the capsule's submodule pinned to its branch.
-assert git("ls-tree", "main", name).split()[:3] == ["160000", "commit", git("rev-parse", code).strip()]
-assert f"branch = {code}" in git("show", "main:.gitmodules")
+assert git("ls-tree", "main", name).split()[:3] == ["160000", "commit", git("rev-parse", tag).strip()]
+assert f"branch = {tag}" in git("show", "main:.gitmodules")
 assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] == "derivative"
-# The branch named by the tag: the capsule at its root (a study dataset), its image's registration
-# and its run record.
-files = set(git("ls-tree", "-r", "--name-only", code).split())
+# The branch named by the capsule's tag: the capsule at its root (a study dataset), its image's
+# registration and its run record.
+files = set(git("ls-tree", "-r", "--name-only", tag).split())
 assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata"} <= files
 assert {"derivatives/validation.jsonl", "derivatives/validation_summary.txt"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") for path in files), files
-assert json.loads(git("show", f"{code}:dataset_description.json"))["DatasetType"] == "study"
-assert "[DATALAD RUNCMD]" in git("log", "--format=%s", code)
+assert json.loads(git("show", f"{tag}:dataset_description.json"))["DatasetType"] == "study"
+assert "[DATALAD RUNCMD]" in git("log", "--format=%s", tag)
 # sourcedata/ links DANDI's DataLad mirror of the Dandiset at its draft head (never fetched).
-sourcedata = git("ls-tree", code, "sourcedata").split()
+sourcedata = git("ls-tree", tag, "sourcedata").split()
 assert sourcedata[:2] == ["160000", "commit"], sourcedata
-assert "url = https://github.com/dandisets/" in git("show", f"{code}:.gitmodules")
+assert "url = https://github.com/dandisets/" in git("show", f"{tag}:.gitmodules")
 
 capsule = pathlib.Path.cwd() / name
 provenance = read_provenance(capsule)
@@ -135,7 +137,7 @@ print(json.dumps({key: row[key] for key in ("total_results", "critical", "error"
 EOF
 
 git -C "$REMOTE" log --oneline main | head -n 5
-git -C "$REMOTE" log --oneline "$CODE" | head -n 5
+git -C "$REMOTE" log --oneline "$TAG" | head -n 5
 
 # A second run finds the successful capsule and does nothing.
 dandi-validations run --dandiset "$DANDISET_ID" --push origin 2>&1 | grep -q "already validated"

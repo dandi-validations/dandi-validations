@@ -2,7 +2,7 @@
 The expected output of a job on Dandiset 000006, whose S3 manifest is frozen in tests/example_dandiset.
 
 ``tests/expected_output`` holds, branch by branch, what the Dandiset's repository holds after one
-validation. ``main/`` is the repository's main branch. The branch named by the image's tag holds
+validation. ``main/`` is the repository's main branch. The branch named by the capsule's tag holds
 the capsule, with ``code/``, ``logs/``, ``derivatives/`` and ``sourcedata`` side by side. The jobs
 run against local stand-ins for GitHub. See tests/README.md.
 
@@ -359,7 +359,7 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
 
 
 def _materialize_branches(*, world: World, names: dict[str, str], destination: pathlib.Path) -> None:
-    for branch in ("main", load_pipeline().container_version):
+    for branch in ("main", load_pipeline().tag):
         materialize(repository=world.repository, ref=branch, destination=destination / branch, names=names)
 
 
@@ -414,7 +414,7 @@ def test_validated_capsule_matches_expected_output(
     if os.environ.get(ACTUAL_OUTPUT_VARIABLE):
         shutil.copytree(actual, os.environ[ACTUAL_OUTPUT_VARIABLE], dirs_exist_ok=True)
     assert_matches_expected(actual=actual, expected=EXPECTED_OUTPUT_DIRECTORY)
-    assert "[DATALAD RUNCMD]" in git("log", "--format=%s", pipeline.container_version, cwd=world.repository)
+    assert "[DATALAD RUNCMD]" in git("log", "--format=%s", pipeline.tag, cwd=world.repository)
 
     # A second run finds the successful capsule and does nothing.
     with caplog.at_level(logging.INFO):

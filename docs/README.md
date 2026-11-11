@@ -27,7 +27,7 @@ dandi-validations prepare --dandiset 000006 --path /path/to/dataset   # form a c
 dandi-validations run --dandiset 000006 --push origin                 # what the Validate workflow runs
 dandi-validations ensure-repos --dandisets 000006 --ref main
 dandi-validations dispatch --dandisets 000006
-dandi-validations collect --output records --tags                     # one table per image tag
+dandi-validations collect --output records --tags                     # one table per capsule tag
 ```
 
 To run one job locally end to end (needs Docker and Apptainer, and `pip install ".[test]"`):
@@ -43,6 +43,7 @@ The repository template (`src/dandi_validations/repository_template/`) and each 
 Rendering fails if a variable has no value, so wrap GitHub Actions expressions (`${{ ... }}`) in `{% raw %}...{% endraw %}`.
 A pull request that changes `src/` or `pyproject.toml` must bump the version in `pyproject.toml`, which the **Version Check** workflow enforces.
 Each capsule's `dataset_description.json` records that version, with the commit, as the version of this code that formed it.
+The version also ends the name of each capsule's branch and directory (`-vX.Y.Z`), so a new version validates every Dandiset again in new capsules.
 Its [pre-commit](https://pre-commit.com) hooks run black, ruff, numpydoc validation, mypy, codespell, shellcheck, md-lines and the workflow schema checks:
 
 ```bash

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dandi-validations"
-version = "0.1.2"
+version = "0.2.1"
 description = "Run streaming DANDI validation per Dandiset on GitHub Actions and record each run as a job capsule."
 readme = "README.md"
 license = "Apache-2.0"

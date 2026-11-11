@@ -1,6 +1,6 @@
 {
   "Name": "DANDI Validations: Dandiset 000006",
-  "Description": "Records of streaming dandi validate runs over Dandiset 000006 of the DANDI Archive, as a standalone derivative dataset: one capsule (pipeline-dandi+validate_tag-{tag}/) per dandi-validation image, each a study dataset with its own dataset_description.json recording its provenance.",
+  "Description": "Records of streaming dandi validate runs over Dandiset 000006 of the DANDI Archive, as a standalone derivative dataset: one capsule (pipeline-dandi+validate_tag-{tag}/) per dandi-validation image and version of DANDI Validations, each a study dataset with its own dataset_description.json recording its provenance.",
   "BIDSVersion": "1.10.1",
   "DatasetType": "derivative",
   "License": "CC-BY-4.0",

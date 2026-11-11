@@ -9,6 +9,7 @@ from dandi_validations import (
     PIPELINE_FILE_PATH,
     VALIDATOR_CODES,
     VersionCodeError,
+    build_capsule_tag,
     build_version_code,
     load_pipeline,
     parse_version_code,
@@ -66,6 +67,34 @@ def test_missing_version() -> None:
 def test_malformed_version_code(code: str) -> None:
     with pytest.raises(VersionCodeError, match="is not a version code"):
         parse_version_code(code)
+
+
+@pytest.mark.ai_generated
+def test_capsule_tag_appends_the_codebase_version() -> None:
+    code = "d0.75.0-s0.12.0-n0.7.1-p3.1.0-h4.1.0-b2.1.0"
+    assert build_capsule_tag(version_code=code, codebase_version="0.2.0") == f"{code}-v0.2.0"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    ("version_code", "codebase_version", "message"),
+    [
+        ("d0.75.0-s0.12.0-n0.7.1-p3.1.0-h4.1.0-b2.1.0", "0.2.0.dev1", "dandi-validations"),
+        ("d0.75.0-s0.12.0-n0.7.1-p3.1.0-h4.1.0-b2.1.0", "0.2.0+g123", "dandi-validations"),
+        ("d0.75.0-s0.12.0-n0.7.1-p3.1.0-h4.1.0-b2.1.0", "v0.2.0", "dandi-validations"),
+        ("latest", "0.2.0", "is not a version code"),
+    ],
+)
+def test_malformed_capsule_tag(version_code: str, codebase_version: str, message: str) -> None:
+    with pytest.raises(VersionCodeError, match=message):
+        build_capsule_tag(version_code=version_code, codebase_version=codebase_version)
+
+
+@pytest.mark.ai_generated
+def test_pipeline_tag_names_this_codebase_version() -> None:
+    pipeline = load_pipeline()
+    project = tomllib.loads((pathlib.Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
+    assert pipeline.tag == f"{pipeline.container_version}-v{project['version']}"
 
 
 @pytest.mark.ai_generated
