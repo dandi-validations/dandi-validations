@@ -27,7 +27,7 @@ https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
     │            output, the image's versions, the GitHub Actions run
     ├── derivatives/  ← present only when the validation completed: validation.jsonl, all the
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
-    ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR)
+    ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of {{ codebase_url }})
     └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset
                        (https://github.com/dandisets/{{ dandiset_id }}) at its draft head when the run was formed
 ```
@@ -41,6 +41,16 @@ To look at a capsule's results:
 git clone https://github.com/{{ organization }}/{{ dandiset_id }}
 git -C {{ dandiset_id }} submodule update --init  # the capsules, not their sourcedata/
 dandi validate --load {{ dandiset_id }}/{{ capsule_pattern }}/derivatives/validation.jsonl --summary
+```
+
+To rerun a capsule's latest validation, with DataLad, git-annex and Apptainer:
+
+```bash
+datalad clone https://github.com/{{ organization }}/{{ dandiset_id }}
+cd {{ dandiset_id }}
+datalad get -n {{ capsule_pattern }}
+cd {{ capsule_pattern }}
+datalad rerun "$(git log --format=%H --grep='DATALAD RUNCMD' -1)"  # downloads the image first
 ```
 
 ---

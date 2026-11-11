@@ -2,5 +2,3 @@
 * annex.largefiles=nothing
 # The image is annexed: only its key is recorded; its content is published on GHCR.
 envs/** annex.largefiles=anything
-# The summary only counts what validation.jsonl holds, so GitHub collapses it in diffs.
-derivatives/validation_summary.txt linguist-generated=true

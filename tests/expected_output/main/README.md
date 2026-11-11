@@ -27,7 +27,7 @@ https://github.com/dandi-validations/000006/   (main)
     │            output, the image's versions, the GitHub Actions run
     ├── derivatives/  ← present only when the validation completed: validation.jsonl, all the
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
-    ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR)
+    ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of https://github.com/dandi-validations/dandi-validations)
     └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset
                        (https://github.com/dandisets/000006) at its draft head when the run was formed
 ```
@@ -41,6 +41,16 @@ To look at a capsule's results:
 git clone https://github.com/dandi-validations/000006
 git -C 000006 submodule update --init  # the capsules, not their sourcedata/
 dandi validate --load 000006/pipeline-dandi+validate_tag-{tag}/derivatives/validation.jsonl --summary
+```
+
+To rerun a capsule's latest validation, with DataLad, git-annex and Apptainer:
+
+```bash
+datalad clone https://github.com/dandi-validations/000006
+cd 000006
+datalad get -n pipeline-dandi+validate_tag-{tag}
+cd pipeline-dandi+validate_tag-{tag}
+datalad rerun "$(git log --format=%H --grep='DATALAD RUNCMD' -1)"  # downloads the image first
 ```
 
 ---
