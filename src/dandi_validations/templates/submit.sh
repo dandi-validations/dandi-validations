@@ -5,6 +5,7 @@
 #   Image:     {{ image_reference }}
 #              digest {{ image_digest }}
 #              ({{ sif_url }} as an Apptainer SIF)
+#              (the same SIF, which git-annex downloads: {{ sif_release_url }})
 #   Where:     a GitHub Actions runner of https://github.com/{{ organization }}/{{ dandiset_id }},
 #              in the capsule's DataLad dataset: branch {{ branch }}
 #

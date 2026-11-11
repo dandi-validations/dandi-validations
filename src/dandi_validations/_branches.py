@@ -13,22 +13,27 @@ remain valid.
 
 On a runner, every capsule branch is a ``git worktree`` of the one clone of the repository,
 checked out at the path of its submodule in main. They all share that clone's objects and its
-git-annex. The annex is initialized as private, so nothing about the ephemeral clone is recorded
-and no git-annex branch is ever pushed.
+git-annex. The annex is initialized as private, so nothing about the ephemeral clone is recorded.
+The repository's git-annex branch records only where each capsule's image can be downloaded, so
+that ``datalad get`` and ``datalad rerun`` work in any clone.
 
 ``main`` holds one git submodule ``pipeline-dandi+validate_tag-<tag>`` per capsule branch. Each
 points at the same repository and branch, pinned to the branch's latest commit. A branch that is
 deleted loses its submodule.
 """
 
+import logging
 import pathlib
 import re
+import urllib.request
 import uuid
 
 from ._capsule import Capsule, capsule_name
 from ._git import run
 from ._globals import DANDISETS_URL_TEMPLATE, SOURCEDATA_BRANCH
 from ._version_code import is_capsule_tag
+
+_log = logging.getLogger(__name__)
 
 # Only the image is annexed, so everything else in a capsule can be read on GitHub.
 CAPSULE_GITATTRIBUTES = (
@@ -39,6 +44,8 @@ CAPSULE_GITATTRIBUTES = (
 )
 CAPSULE_GITIGNORE = "intermediate/\n"
 SOURCEDATA = "sourcedata"
+
+_SHA256_KEY_RE = re.compile(r"SHA256E?-s\d+--(?P<sha256>[0-9a-f]{64})(\..*)?")
 
 
 def datalad_dataset_files() -> dict[str, str]:
@@ -212,6 +219,57 @@ def link_sourcedata(*, capsule: Capsule, url_template: str | None = None) -> dic
     run(command=["git", "update-index", "--add", "--cacheinfo", f"160000,{commit},{SOURCEDATA}"], cwd=capsule.path)
     run(command=["git", "add", ".gitmodules"], cwd=capsule.path)
     return {"path": SOURCEDATA, "url": url, "branch": SOURCEDATA_BRANCH, "commit": commit}
+
+
+def _read_url(url: str, /) -> str:
+    # file:// URLs are read too, so that a local copy can stand in for a published one.
+    with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310
+        return response.read().decode()
+
+
+def register_image_url(*, capsule: Capsule, container_name: str, url: str) -> bool:
+    """
+    Record where git-annex can download a capsule's image, if the image published there is the capsule's.
+
+    The published image is identified by the SHA-256 published next to it, at ``<url>.sha256``.
+    An image obtained some other way (e.g., built locally) has another key, and is left alone.
+
+    Parameters
+    ----------
+    capsule : Capsule
+        The capsule.
+    container_name : str
+        The name of the image's registration in the capsule's DataLad configuration.
+    url : str
+        Where the image is published.
+
+    Returns
+    -------
+    bool
+        Whether the URL was recorded.
+
+    """
+    image = run(
+        command=["git", "config", "-f", ".datalad/config", "--get", f"datalad.containers.{container_name}.image"],
+        cwd=capsule.path,
+        check=False,
+    ).stdout.strip()
+    if not image:
+        return False
+    key = run(command=["git", "annex", "lookupkey", "--", image], cwd=capsule.path, check=False).stdout.strip()
+    match = _SHA256_KEY_RE.fullmatch(key)
+    if match is None:
+        return False
+    try:
+        published = _read_url(f"{url}.sha256").split()
+    except (OSError, ValueError) as error:
+        _log.warning("Could not read the SHA-256 published with %s (%s), so its URL is not recorded.", url, error)
+        return False
+    if published[:1] != [match["sha256"]]:
+        _log.info("The image published at %s is not %s's, so its URL is not recorded.", url, capsule.name)
+        return False
+    run(command=["git", "annex", "registerurl", key, url], cwd=capsule.path)
+    return True
 
 
 def commit_capsule(*, capsule: Capsule, paths: list[pathlib.Path], message: str) -> bool:

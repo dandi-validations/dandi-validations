@@ -5,6 +5,7 @@ The example is Dandiset 000006 (see tests/README.md). What the repository holds 
 test_expected_output.py's.
 """
 
+import hashlib
 import json
 import logging
 import pathlib
@@ -23,6 +24,7 @@ from dandi_validations import (
     load_pipeline,
     prune_submodules,
     read_provenance,
+    register_image_url,
     remote_heads,
     run_job,
     sync_repository,
@@ -60,6 +62,38 @@ def _clone(*, world: World, name: str) -> pathlib.Path:
     return destination
 
 
+def _add_image(*, capsule: Capsule, content: bytes) -> pathlib.Path:
+    """Register a stand-in image in a capsule, as ``datalad containers-add`` does, and return its path."""
+    name = load_pipeline().container_name
+    image = pathlib.Path("envs") / name / "image"
+    (capsule.path / image).parent.mkdir(parents=True)
+    (capsule.path / image).write_bytes(content)
+    git("annex", "add", "--quiet", str(image), cwd=capsule.path)
+    git("config", "-f", ".datalad/config", f"datalad.containers.{name}.image", str(image), cwd=capsule.path)
+    return image
+
+
+def _publish(*, directory: pathlib.Path, content: bytes, checksum: bool = True) -> str:
+    """Publish a stand-in image as the build workflow's release does, and return its URL."""
+    directory.mkdir()
+    sif = directory / "image.sif"
+    sif.write_bytes(content)
+    if checksum:
+        (directory / "image.sif.sha256").write_text(hashlib.sha256(content).hexdigest() + "\n")
+    return sif.as_uri()
+
+
+def _record(runner: pathlib.Path, /) -> None:
+    commit_and_publish(
+        main_root=runner,
+        capsule=_capsule(runner),
+        paths=[_capsule(runner).path],
+        message="Record",
+        push_to="origin",
+        branch="main",
+    )
+
+
 def _changed_manifest(tmp_path: pathlib.Path, /) -> pathlib.Path:
     changed_manifest = tmp_path / "changed-manifest"
     shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
@@ -80,7 +114,7 @@ def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path: pathlib.Path, monk
     assert dot_git.is_file() or dot_git.is_symlink()
     assert str(capsule.path) in git("worktree", "list", cwd=world.runner)
     assert git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
-    # sourcedata/ is linked, never fetched, and no git-annex branch is pushed.
+    # sourcedata/ is linked, never fetched, and the git-annex branch is not pushed while it records nothing.
     assert list((capsule.path / "sourcedata").iterdir()) == []
     assert set(remote_heads(root=world.runner, remote="origin")) == {"main", capsule.tag}
 
@@ -157,6 +191,75 @@ def test_a_runner_behind_main_claims_on_top_of_it(tmp_path: pathlib.Path, monkey
     assert git("rev-parse", "main~1", cwd=world.repository).strip() == first_main
     new_head = remote_heads(root=rerun, remote="origin")[capsule.tag]
     assert git("ls-tree", "main", capsule.name, cwd=world.repository).split()[2] == new_head
+
+
+@pytest.mark.ai_generated
+def test_a_fresh_clone_gets_the_image_from_where_it_is_published(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    image = _add_image(capsule=capsule, content=b"the image")
+    url = _publish(directory=tmp_path / "release", content=b"the image")
+
+    assert register_image_url(capsule=capsule, container_name=load_pipeline().container_name, url=url)
+    _record(world.runner)
+    assert "git-annex" in remote_heads(root=world.runner, remote="origin")
+    # Nothing about the runner's own clone reaches the branch.
+    runner_uuid = git("config", "--get", "annex.uuid", cwd=world.runner).strip()
+    assert runner_uuid not in git("log", "--patch", "git-annex", cwd=world.repository)
+
+    # git-annex downloads file:// URLs, which stand in for the release here, only once allowed.
+    git("config", "--global", "annex.security.allowed-url-schemes", "http https ftp file", cwd=tmp_path)
+    fresh = tmp_path / "fresh"
+    git("clone", "--quiet", "--branch", capsule.tag, REPOSITORY_URL, str(fresh), cwd=tmp_path)
+    git("annex", "init", "--quiet", "a reader", cwd=fresh)
+    git("annex", "get", "--quiet", str(image), cwd=fresh)
+    assert (fresh / image).read_bytes() == b"the image"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    ("published", "checksum"),
+    [(b"another image", True), (b"the image", False)],
+    ids=["another image", "no checksum"],
+)
+def test_an_image_not_known_to_be_the_published_one_is_not_pointed_at_it(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    published: bytes,
+    checksum: bool,
+) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    _add_image(capsule=capsule, content=b"the image")
+    url = _publish(directory=tmp_path / "release", content=published, checksum=checksum)
+
+    assert not register_image_url(capsule=capsule, container_name=load_pipeline().container_name, url=url)
+    _record(world.runner)
+    assert "git-annex" not in remote_heads(root=world.runner, remote="origin")
+
+
+@pytest.mark.ai_generated
+def test_runners_merge_what_each_records_in_git_annex(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    other = _clone(world=world, name="other-runner")
+    _claim(world.runner)
+    _claim(other)
+    # Each runner started its own git-annex branch, so neither push is a fast-forward of the other.
+    urls = {}
+    for runner, digit in ((world.runner, "1"), (other, "2")):
+        key = f"SHA256E-s1--{digit * 64}"
+        urls[runner] = f"https://example.org/{digit}"
+        git("annex", "registerurl", key, urls[runner], cwd=runner)
+
+    _record(world.runner)
+    _record(other)
+    for url in urls.values():
+        assert git("grep", "--files-with-matches", url, "git-annex", cwd=world.repository)
 
 
 @pytest.mark.ai_generated

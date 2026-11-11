@@ -64,7 +64,7 @@ DANDI_VALIDATIONS_REGENERATE_EXPECTED_OUTPUT=1 bash scripts/e2e_local.sh 000006
 ```
 
 [`test_branches.py`](test_branches.py) checks, on the same example, how capsule branches and `main`'s submodules behave across jobs.
-It covers other runners, reruns, deleted branches, the template sync and the collect step.
+It covers other runners, reruns, deleted branches, the template sync, the collect step and downloading a capsule's image from where it is published.
 
 ## Unit tests
 

@@ -7,6 +7,9 @@ name: Build and publish container
 #   ghcr.io/dandi-validations/dandi-validation:sif-<version code>  the same image as an Apptainer SIF (ORAS)
 #
 # with the pixi.lock it was built from attached to the OCI image (ORAS), and carried inside it.
+# The same SIF and its SHA-256 are also published as the release sif-<version code> of this
+# repository. Unlike GHCR, a release downloads without a token, so git-annex can fetch a capsule's
+# image from it. An image published before its release existed gets one from its SIF on GHCR.
 #
 # The version code is derived from the six validator versions in containers/dandi-validation/pixi.lock
 # (local `+...` segments dropped), and must equal `container.version` in
@@ -26,7 +29,8 @@ on:
       - ".github/workflows/build_container.yml"
 
 permissions:
-  contents: read
+  # For the release of each SIF.
+  contents: write
   packages: write
 
 concurrency:
@@ -55,12 +59,26 @@ jobs:
           code="$(dandi-validations version-code --lock containers/dandi-validation/pixi.lock)"
           pinned="$(jq -r '.container.version' src/dandi_validations/pipeline.json)"
           image="$(jq -r '.container.image' src/dandi_validations/pipeline.json | tr '[:upper:]' '[:lower:]')"
+          name="$(jq -r '.container.name' src/dandi_validations/pipeline.json)"
           if [ "$code" != "$pinned" ]; then
             echo "::error::pixi.lock makes version code ${code}, but pipeline.json pins ${pinned}."
             exit 1
           fi
           echo "code=${code}" >> "$GITHUB_OUTPUT"
           echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: Check for the SIF's release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODE: ${{ steps.code.outputs.code }}
+        run: |
+          if gh release view "sif-${CODE}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Log in to the GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
@@ -115,7 +133,7 @@ jobs:
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Apptainer
-        if: steps.existing.outputs.exists == 'false'
+        if: steps.existing.outputs.exists == 'false' || steps.release.outputs.exists == 'false'
         uses: ./.github/actions/setup-apptainer
 
       - name: Push the SIF
@@ -130,6 +148,38 @@ jobs:
           echo "$REGISTRY_PASSWORD" | apptainer registry login --username "${{ github.actor }}" --password-stdin oras://ghcr.io
           apptainer push dandi-validation.sif "oras://${IMAGE}:sif-${CODE}"
           sha256sum dandi-validation.sif | cut -d' ' -f1 > sif.sha256
+
+      - name: Pull the published SIF
+        if: steps.existing.outputs.exists == 'true' && steps.release.outputs.exists == 'false'
+        env:
+          IMAGE: ${{ steps.code.outputs.image }}
+          CODE: ${{ steps.code.outputs.code }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$REGISTRY_PASSWORD" | apptainer registry login --username "${{ github.actor }}" --password-stdin oras://ghcr.io
+          apptainer pull dandi-validation.sif "oras://${IMAGE}:sif-${CODE}"
+          sha256sum dandi-validation.sif | cut -d' ' -f1 > sif.sha256
+
+      - name: Publish the SIF as a release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ steps.code.outputs.image }}
+          CODE: ${{ steps.code.outputs.code }}
+          NAME: ${{ steps.code.outputs.name }}
+        run: |
+          set -euo pipefail
+          # Capsules expect these names (Pipeline.sif_release_url).
+          asset="${NAME}_${CODE}.sif"
+          ln dandi-validation.sif "$asset"
+          cp sif.sha256 "${asset}.sha256"
+          gh release create "sif-${CODE}" "$asset" "${asset}.sha256" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --latest=false \
+            --title "${NAME} ${CODE} (SIF)" \
+            --notes "The ${NAME} image of version code \`${CODE}\` as an Apptainer SIF, the same file as \`oras://${IMAGE}:sif-${CODE}\`. Its SHA-256 is \`$(cat sif.sha256)\`. Capsules validated with this image download it from here with \`datalad get\`."
 
       - name: Set up ORAS
         if: steps.existing.outputs.exists == 'false'
@@ -163,6 +213,7 @@ jobs:
             echo "| OCI digest | \`${DIGEST}\` |"
             echo "| SIF | \`oras://${IMAGE}:sif-${CODE}\` |"
             echo "| SIF sha256 | \`$(cat sif.sha256)\` |"
+            echo "| SIF release | [sif-${CODE}](${{ github.server_url }}/${{ github.repository }}/releases/tag/sif-${CODE}) |"
             echo "| Lock | attached to \`${IMAGE}@${DIGEST}\` (\`oras discover\`) |"
             echo
             echo '```json'

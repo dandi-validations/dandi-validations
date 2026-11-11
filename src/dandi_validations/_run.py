@@ -18,12 +18,13 @@ from ._branches import (
     link_sourcedata,
     prune_submodules,
     publish_capsule,
+    register_image_url,
     register_submodule,
     remote_heads,
     remote_url,
 )
 from ._capsule import Capsule, capsule_status, is_up_to_date, plan_capsule, write_capsule
-from ._git import ensure_annex, pull, push, repository_root, run
+from ._git import ensure_annex, pull, push, push_annex, repository_root, run
 from ._globals import DEFAULT_BRANCH, DEFAULT_PARAMS_KEY
 
 _log = logging.getLogger(__name__)
@@ -104,8 +105,10 @@ def run_job(  # noqa: PLR0913
 
     The capsule's branch is checked out (or started) as a worktree of this clone, and its run is
     committed to it. Main's submodule for it is pinned to the result, both when the run is claimed
-    and when it is recorded. With ``push_to``, the clone is first rebased onto the remote's main,
-    and both branches are pushed at each point.
+    and when it is recorded. After the run, the URL the image is published at is recorded in the
+    git-annex branch, so that ``datalad get`` can download it. With ``push_to``, the clone is first
+    rebased onto the remote's main, and both branches are pushed at each point, with the git-annex
+    branch once it records anything.
 
     Parameters
     ----------
@@ -148,7 +151,7 @@ def run_job(  # noqa: PLR0913
         # commit onto main could not merge.
         pull(root=root, remote=push_to, branch=branch)
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
-    ensure_annex(root=root, remote=None)
+    ensure_annex(root=root, remote=push_to)
 
     assets_jsonld = dandiset_yaml = None
     if manifest_directory is not None:
@@ -208,6 +211,11 @@ def run_job(  # noqa: PLR0913
         "github_actions": _github_context(),
     }
     (capsule.logs_directory / "run.json").write_text(json.dumps(run_record, indent=2) + "\n")
+    register_image_url(
+        capsule=capsule,
+        container_name=plan.pipeline.container_name,
+        url=plan.pipeline.sif_release_url,
+    )
 
     status = capsule_status(capsule.path)
     commit_and_publish(
@@ -236,6 +244,8 @@ def commit_and_publish(  # noqa: PLR0913
 ) -> None:
     """
     Commit a capsule's branch, then pin main's submodule for it.
+
+    With ``push_to``, the git-annex branch is pushed after both, once it records anything.
 
     Parameters
     ----------
@@ -269,3 +279,4 @@ def commit_and_publish(  # noqa: PLR0913
     commit_main(main_root=main_root, paths=[], message=message)
     if push_to:
         push(root=main_root, remote=push_to, branch=branch)
+        push_annex(root=main_root, remote=push_to)
