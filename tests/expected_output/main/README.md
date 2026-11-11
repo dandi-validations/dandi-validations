@@ -6,13 +6,15 @@ Each run happens on this repository's own GitHub Actions runner (the **Validate*
 
 1. A DataLad dataset of the Dandiset is built directly from the archive's manifest from S3: every file gets its SHA-256 git-annex key and its S3 URL, and nothing is downloaded.[^sourcedata]
 2. `dandi validate --missing-file-content=stream` validates it, streaming only the parts of each file the validators need.
-3. The validation runs inside the `dandi-validation` image from the GitHub Container Registry (`ghcr.io/dandi-validations/dandi-validation:{tag}`), through Apptainer, with `datalad containers-run`, whose commit records the command, its inputs and its outputs.
+3. The validation runs inside the `dandi-validation` image from the GitHub Container Registry (`ghcr.io/dandi-validations/dandi-validation:{version code}`), through Apptainer, with `datalad containers-run`, whose commit records the command, its inputs and its outputs.
    [duct](https://github.com/con/duct) records its resource usage.
 
 ## Layout
 
-The repository is a DataLad dataset laid out as a standalone [BIDS derivative dataset (type 2)](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets) of the Dandiset, with one [BIDS Study](https://bids-specification.readthedocs.io/en/stable/common-principles.html#study-dataset) capsule per `dandi-validation` image.
-Each capsule is a DataLad dataset on its own branch, named by the image's tag (its validator version code), and `main` holds a submodule for each of those branches:
+The repository is a DataLad dataset laid out as a standalone [BIDS derivative dataset (type 2)](https://bids-specification.readthedocs.io/en/stable/common-principles.html#storage-of-derived-datasets) of the Dandiset, with one [BIDS Study](https://bids-specification.readthedocs.io/en/stable/common-principles.html#study-dataset) capsule per `dandi-validation` image and version of DANDI Validations.
+Each capsule is a DataLad dataset on its own branch, named by its `{tag}`.
+That is the image's tag (its validator version code), followed by `-v` and the version of DANDI Validations that formed it.
+`main` holds a submodule for each of those branches:
 
 ```
 https://github.com/dandi-validations/000006/   (main)
@@ -30,7 +32,7 @@ https://github.com/dandi-validations/000006/   (main)
                        (https://github.com/dandisets/000006) at its draft head when the run was formed
 ```
 
-A capsule holds the latest validation of the Dandiset with its image.
+A capsule holds the latest validation of the Dandiset with its image and version of DANDI Validations.
 It is not run again while the Dandiset's files and metadata are unchanged.
 When they change, the next run replaces its contents in a new commit on its branch, whose history keeps every earlier run and its `datalad containers-run` record.
 To look at a capsule's results:

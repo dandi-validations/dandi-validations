@@ -114,7 +114,7 @@ def write_records(*, rows: list[dict], output_directory: pathlib.Path, by_tag: b
     output_directory : pathlib.Path
         Where to write ``capsules.tsv`` and ``capsules.json``.
     by_tag : bool, default=False
-        Whether to write one table per image tag instead, each in a directory named by the tag.
+        Whether to write one table per capsule tag instead, each in a directory named by the tag.
 
     Returns
     -------
@@ -143,7 +143,7 @@ def collect(  # noqa: PLR0913
     by_tag: bool = False,
 ) -> list[pathlib.Path]:
     """
-    Tabulate the capsules of many Dandiset repositories into one capsule table, or one per image tag.
+    Tabulate the capsules of many Dandiset repositories into one capsule table, or one per capsule tag.
 
     Parameters
     ----------
@@ -158,7 +158,7 @@ def collect(  # noqa: PLR0913
     workers : int, default=8
         How many repositories to read at once.
     by_tag : bool, default=False
-        Whether to write one table per image tag, each in a directory of ``output_directory`` named
+        Whether to write one table per capsule tag, each in a directory of ``output_directory`` named
         by the tag.
 
     Returns

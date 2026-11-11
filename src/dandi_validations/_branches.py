@@ -1,13 +1,15 @@
 """
 Work on capsule branches as worktrees of main's clone, and keep main's submodules for them.
 
-Each capsule is a DataLad dataset on its own branch of the Dandiset repository, named exactly by
-its image's tag (the validator version code, e.g. ``d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2``).
+Each capsule is a DataLad dataset on its own branch of the Dandiset repository, named by its tag.
+That is its image's tag (the validator version code), then ``-v`` and the version of
+dandi-validations that formed it, e.g. ``d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0``.
 The branch holds ``code/``, ``logs/`` and ``derivatives/`` at its root. It also holds the
 registration of its image (``envs/dandi-validation/image``), ``sourcedata/`` (a subdataset
 linking DANDI's DataLad mirror of the Dandiset), and the ``datalad containers-run`` record of
-every run. Branches are never merged. Each is created when its image first validates the
-Dandiset, and later runs add commits to it, so earlier pins remain valid.
+every run. Branches are never merged. Each is created when its image and version of
+dandi-validations first validate the Dandiset, and later runs add commits to it, so earlier pins
+remain valid.
 
 On a runner, every capsule branch is a ``git worktree`` of the one clone of the repository,
 checked out at the path of its submodule in main. They all share that clone's objects and its
@@ -26,7 +28,7 @@ import uuid
 from ._capsule import Capsule, capsule_name
 from ._git import run
 from ._globals import DANDISETS_URL_TEMPLATE, SOURCEDATA_BRANCH
-from ._version_code import is_version_code
+from ._version_code import is_capsule_tag
 
 # Only the image is annexed, so everything else in a capsule can be read on GitHub.
 CAPSULE_GITATTRIBUTES = (
@@ -329,7 +331,7 @@ def prune_submodules(*, main_root: pathlib.Path, branches: set[str], pipeline: s
     """
     removed = []
     for name, branch in _registered_submodules(main_root).items():
-        if branch in branches or not is_version_code(branch) or name != capsule_name(pipeline=pipeline, tag=branch):
+        if branch in branches or not is_capsule_tag(branch) or name != capsule_name(pipeline=pipeline, tag=branch):
             continue
         run(command=["git", "config", "-f", ".gitmodules", "--remove-section", f"submodule.{name}"], cwd=main_root)
         run(command=["git", "update-index", "--force-remove", name], cwd=main_root)
@@ -346,7 +348,7 @@ def prune_submodules(*, main_root: pathlib.Path, branches: set[str], pipeline: s
 
 def capsule_branches(*, main_root: pathlib.Path, remote: str) -> set[str]:
     """
-    List the remote's branches that hold capsules, which are those named by an image tag.
+    List the remote's branches that hold capsules, which are those named by a capsule's tag.
 
     Parameters
     ----------
@@ -361,7 +363,7 @@ def capsule_branches(*, main_root: pathlib.Path, remote: str) -> set[str]:
         The capsule branches.
 
     """
-    return {branch for branch in remote_heads(root=main_root, remote=remote) if is_version_code(branch)}
+    return {branch for branch in remote_heads(root=main_root, remote=remote) if is_capsule_tag(branch)}
 
 
 def commit_main(*, main_root: pathlib.Path, paths: list[str], message: str) -> bool:
