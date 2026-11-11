@@ -12,6 +12,10 @@ There is one relaxation. A local version segment (everything from ``+``, such as
 image built from an unreleased commit still gets a code. Its full versions stay recorded in the
 image (``/opt/dandi-validation/versions.json``) and in every job's ``logs/container_versions.json``.
 Pre-release, dev and post-release versions are still rejected.
+
+A capsule's tag, which names its branch and its directory, is the image's version code followed by
+``-v`` and the version of dandi-validations that formed it, as in
+``d0.75.0-s0.12.0-n0.7.1-p3.1.0-h4.1.0-b2.1.0-v0.2.0``.
 """
 
 import collections.abc
@@ -28,6 +32,7 @@ VALIDATOR_CODES = {
 
 _PLAIN_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _VERSION_CODE_RE = re.compile("-".join(rf"{code}(\d+\.\d+\.\d+)" for code in VALIDATOR_CODES.values()))
+_CAPSULE_TAG_RE = re.compile(rf"{_VERSION_CODE_RE.pattern}-v\d+\.\d+\.\d+")
 
 
 class VersionCodeError(ValueError):
@@ -86,9 +91,38 @@ def build_version_code(versions: collections.abc.Mapping[str, str], /) -> str:
     return "-".join(entries)
 
 
-def is_version_code(text: str, /) -> bool:
+def build_capsule_tag(*, version_code: str, codebase_version: str) -> str:
     """
-    Check whether a text is a version code.
+    Form the tag of a capsule, from its image's version code and the version of dandi-validations.
+
+    Parameters
+    ----------
+    version_code : str
+        The image's version code.
+    codebase_version : str
+        The version of dandi-validations that forms the capsule.
+
+    Returns
+    -------
+    str
+        The tag, ``<version code>-v<codebase version>``.
+
+    Raises
+    ------
+    VersionCodeError
+        If the text is not a version code, or the version of dandi-validations is not a plain release.
+
+    """
+    parse_version_code(version_code)
+    if not _PLAIN_VERSION_RE.fullmatch(codebase_version):
+        message = f"dandi-validations {codebase_version} is not a plain MAJOR.MINOR.PATCH release."
+        raise VersionCodeError(message)
+    return f"{version_code}-v{codebase_version}"
+
+
+def is_capsule_tag(text: str, /) -> bool:
+    """
+    Check whether a text is the tag of a capsule.
 
     Parameters
     ----------
@@ -98,10 +132,10 @@ def is_version_code(text: str, /) -> bool:
     Returns
     -------
     bool
-        Whether it is a version code.
+        Whether it is a capsule's tag.
 
     """
-    return _VERSION_CODE_RE.fullmatch(text) is not None
+    return _CAPSULE_TAG_RE.fullmatch(text) is not None
 
 
 def parse_version_code(version_code: str, /) -> dict[str, str]:

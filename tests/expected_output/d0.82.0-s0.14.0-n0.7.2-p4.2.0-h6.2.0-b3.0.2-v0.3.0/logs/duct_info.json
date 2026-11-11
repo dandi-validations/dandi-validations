@@ -1,5 +1,5 @@
 {
-  "command": "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'",
+  "command": "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'",
   "system": {
     "cpu_total": "<varies>",
     "memory_total": "<varies>",
@@ -27,7 +27,7 @@
   "schema_version": "0.2.3",
   "execution_summary": {
     "exit_code": 0,
-    "command": "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'",
+    "command": "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/dandiset.yaml --input ./code/assets.tsv --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'",
     "logs_prefix": "./logs/duct_",
     "wall_clock_time": "<varies>",
     "peak_rss": "<varies>",
@@ -42,7 +42,7 @@
     "num_reports": "<varies>",
     "start_time": "<varies>",
     "end_time": "<varies>",
-    "working_directory": "<tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
+    "working_directory": "<tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0"
   },
   "output_paths": {
     "stdout": "./logs/duct_stdout",
@@ -51,6 +51,6 @@
     "info": "./logs/duct_info.json",
     "prefix": "./logs/duct_"
   },
-  "working_directory": "<tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
-  "message": "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2: dandi validate 000006"
+  "working_directory": "<tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0",
+  "message": "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.0: dandi validate 000006"
 }

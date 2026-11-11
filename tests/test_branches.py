@@ -52,7 +52,7 @@ def _capsule(runner: pathlib.Path, /) -> Capsule:
         repository_root=runner,
         dandiset_id=EXAMPLE_DANDISET_ID,
         pipeline=pipeline.pipeline,
-        tag=pipeline.container_version,
+        tag=pipeline.tag,
     )
 
 
@@ -278,6 +278,21 @@ def test_deleted_branches_lose_their_submodule(tmp_path: pathlib.Path, monkeypat
     assert not (world.runner / ".gitmodules").exists()
     staged = git("diff", "--cached", "--name-only", cwd=world.runner).split()
     assert {".gitmodules", capsule.name} <= set(staged)
+
+
+@pytest.mark.ai_generated
+def test_only_branches_named_by_a_capsule_tag_hold_capsules(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+    version_code = load_pipeline().container_version
+    for branch in (version_code, f"{version_code}-vnext", "feature"):
+        git("push", "--quiet", "origin", f"main:refs/heads/{branch}", cwd=world.runner)
+
+    assert capsule_branches(main_root=world.runner, remote="origin") == {capsule.tag}
 
 
 @pytest.mark.ai_generated

@@ -2,10 +2,12 @@
 
 import dataclasses
 import hashlib
+import importlib.metadata
 import json
 import pathlib
 
 from ._globals import CODEBASE_URL
+from ._version_code import build_capsule_tag
 
 PACKAGE_DIRECTORY = pathlib.Path(__file__).parent
 PIPELINE_FILE_PATH = PACKAGE_DIRECTORY / "pipeline.json"
@@ -18,7 +20,7 @@ REPOSITORY_TEMPLATE_DIRECTORY = PACKAGE_DIRECTORY / "repository_template"
 @dataclasses.dataclass(frozen=True)
 class Pipeline:
     """
-    Describe what a job runs: the container and the dandi-cli inside it.
+    Describe what a job runs: the container, the dandi-cli inside it, and the code that runs it.
 
     Attributes
     ----------
@@ -36,6 +38,8 @@ class Pipeline:
         The dandi-cli commit installed in the image.
     dandi_cli_reference : str
         Where that commit comes from (e.g., a pull request).
+    codebase_version : str
+        The version of dandi-validations that forms and runs the job.
 
     """
 
@@ -46,6 +50,20 @@ class Pipeline:
     dandi_cli_repository: str
     dandi_cli_commit: str
     dandi_cli_reference: str
+    codebase_version: str
+
+    @property
+    def tag(self) -> str:
+        """
+        Name the capsule of a job by its image and the version of dandi-validations.
+
+        Returns
+        -------
+        str
+            The capsule's tag, ``<version code>-v<codebase version>``, which names its branch.
+
+        """
+        return build_capsule_tag(version_code=self.container_version, codebase_version=self.codebase_version)
 
     @property
     def image_reference(self) -> str:
@@ -125,7 +143,7 @@ class Pipeline:
 
 def load_pipeline(file_path: pathlib.Path = PIPELINE_FILE_PATH, /) -> Pipeline:
     """
-    Read the pinned pipeline.
+    Read the pinned pipeline, run by the installed version of dandi-validations.
 
     Parameters
     ----------
@@ -147,6 +165,7 @@ def load_pipeline(file_path: pathlib.Path = PIPELINE_FILE_PATH, /) -> Pipeline:
         dandi_cli_repository=content["dandi_cli"]["repository"],
         dandi_cli_commit=content["dandi_cli"]["commit"],
         dandi_cli_reference=content["dandi_cli"].get("reference", ""),
+        codebase_version=importlib.metadata.version("dandi-validations"),
     )
 
 

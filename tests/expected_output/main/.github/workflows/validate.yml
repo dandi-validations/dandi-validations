@@ -2,8 +2,9 @@ name: Validate
 
 # Validates Dandiset 000006 with `dandi validate --missing-file-content=stream`
 # (dandi/dandi-cli#1956) inside the dandi-validation image from GHCR, run through Apptainer by
-# `datalad containers-run` and tracked by duct. Each run is recorded in the capsule of its image:
-# the branch named by its tag, which main holds as the submodule pipeline-dandi+validate_tag-{tag}/.
+# `datalad containers-run` and tracked by duct. Each run is recorded in the capsule of its image and
+# of the version of dandi-validations: the branch named by their tag, which main holds as the
+# submodule pipeline-dandi+validate_tag-{tag}/.
 #
 # This file is managed by https://github.com/dandi-validations/dandi-validations:
 # edits made here are overwritten whenever the repository template is synced.
