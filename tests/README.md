@@ -44,7 +44,7 @@ Values that differ from run to run appear as placeholders:
 | `<tmp>`, `<image cache>`, `<python>` | the test's directory, the image's cache and the host's Python |
 | `<varies>` | measurements and host details in `duct_info.json` and `run.json` |
 
-Logs that hold progress output and samples taken during the run (`duct_stdout`, `duct_stderr`, `duct_usage.jsonl` and `submit.log`) show one run on GitHub Actions.
+Logs that hold progress output and samples taken during the run (`duct_stdout`, `duct_stderr`, `duct_usage.jsonl` and `submit.log`) show one run of the container test, from whichever machine last regenerated them.
 Only their presence is checked.
 
 The rest is fixed in [`test_expected_output.py`](test_expected_output.py):
