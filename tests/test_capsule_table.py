@@ -62,7 +62,6 @@ def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandise
         "files_with_issues": 2,
         "wall_clock_seconds": 41.9,
         "assets": 2,
-        "skipped_assets": 2,
     }
     assert {key: row[key] for key in expected} == expected
     assert row["claimed_by"].startswith(("local:", "https://"))

@@ -1,27 +1,27 @@
 [INFO] Making sure inputs are available (this may take some time) 
 [INFO] == Command start (output follows) ===== 
-2026-11-13 01:53:23,166 [    INFO] Validating 6 files
-2026-11-13 01:53:30,469 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,281 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,429 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,474 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,706 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,766 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:08,623 [    INFO] Validating 6 files
+2026-11-13 02:10:15,863 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:15,961 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:15,963 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,294 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,456 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,732 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,209 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-13 02:10:17,029 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,348 [    INFO] [2/6] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
+2026-11-13 02:10:17,309 [    INFO] [2/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,354 [    INFO] [3/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,434 [    INFO] [4/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
+2026-11-13 02:10:17,536 [    INFO] [3/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-13 02:10:17,540 [    INFO] [4/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,682 [    INFO] [5/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
+2026-11-13 02:10:17,625 [    INFO] [5/6] sub-anm369962/sub-anm369962_ses-20170313.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"<capsule>/intermediate/validation.jsonl
 
@@ -39,6 +39,6 @@ By standard:
   N/A: 54
   NWB: 48
   DANDI-LAYOUT: 6
-2026-11-13 01:53:33,831 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.20Z-19007.log
-2026-11-13 01:53:34,877 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.34Z-21777.log
+2026-11-13 02:10:18,530 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-02.10.05Z-3594.log
+2026-11-13 02:10:19,402 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-02.10.19Z-6364.log
 [INFO] == Command exit (modification check follows) ===== 

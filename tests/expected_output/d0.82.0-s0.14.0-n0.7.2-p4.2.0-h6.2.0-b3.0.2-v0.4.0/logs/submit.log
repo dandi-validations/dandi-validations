@@ -13,9 +13,9 @@ action summary:
   add (ok: 2)
   containers_add (ok: 1)
   save (ok: 1)
-2026-11-13T01:53:16+0000 [INFO    ] con-duct: No .env files found
-2026-11-13T01:53:16+0000 [INFO    ] con-duct: duct 0.23.0 is executing "datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/assets.tsv --input ./sourcedata/assets.jsonld --input ./sourcedata/dandiset.yaml --output ./sourcedata/000006 --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'"...
-2026-11-13T01:53:16+0000 [INFO    ] con-duct: Log files will be written to ./logs/duct_
+2026-11-13T02:10:02+0000 [INFO    ] con-duct: No .env files found
+2026-11-13T02:10:02+0000 [INFO    ] con-duct: duct 0.23.0 is executing "<capsule>/sourcedata/000006/dandiset.yaml --output ./sourcedata/000006 --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'"...
+2026-11-13T02:10:02+0000 [INFO    ] con-duct: Log files will be written to ./logs/duct_
 [INFO] Making sure inputs are available (this may take some time) 
 [INFO] == Command start (output follows) ===== 
 === dandi-validation image ===
@@ -40,35 +40,35 @@ action summary:
   "git_annex": "10.20260717-g0c917920c80ab1e8cc3d8f5886537708949e1659"<capsule>/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170309.nwb (file) [registered URL]
 fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170310.nwb (file) [registered URL]
 fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170313.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
 fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170227.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
 fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170228.nwb (file) [registered URL]
 action summary:
   fromkey (ok: 6)
 Registered 6 of 6 files with their S3 URLs (none downloaded).
 === Validating Dandiset 000006 (--missing-file-content=stream, -J 8) ===
-2026-11-13 01:53:23,166 [    INFO] Validating 6 files
-2026-11-13 01:53:30,469 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,281 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,429 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,474 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,706 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:53:31,766 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:08,623 [    INFO] Validating 6 files
+2026-11-13 02:10:15,863 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:15,961 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:15,963 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,294 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,456 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 02:10:16,732 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,209 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-13 02:10:17,029 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,348 [    INFO] [2/6] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
+2026-11-13 02:10:17,309 [    INFO] [2/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,354 [    INFO] [3/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,434 [    INFO] [4/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
+2026-11-13 02:10:17,536 [    INFO] [3/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-13 02:10:17,540 [    INFO] [4/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:53:32,682 [    INFO] [5/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
+2026-11-13 02:10:17,625 [    INFO] [5/6] sub-anm369962/sub-anm369962_ses-20170313.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"<capsule>/intermediate/validation.jsonl
 
@@ -86,33 +86,32 @@ By standard:
   N/A: 54
   NWB: 48
   DANDI-LAYOUT: 6
-2026-11-13 01:53:33,831 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.20Z-19007.log
+2026-11-13 02:10:18,530 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-02.10.05Z-3594.log
 dandi validate exited with 1
 === Summarizing results ===
-2026-11-13 01:53:34,877 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.34Z-21777.log
+2026-11-13 02:10:19,402 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-02.10.19Z-6364.log
 === Writing results ===
 [INFO] == Command exit (modification check follows) ===== 
 run(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0 (dataset) [apptainer exec --cleanenv envs/dandi-val...]
 add(ok): derivatives/validation.jsonl (file)
 add(ok): derivatives/validation_summary.txt (file)
-add(ok): sourcedata/000006/dandiset.yaml (file)
 save(ok): . (dataset)
 action summary:
-  add (ok: 3)
-  get (notneeded: 6)
+  add (ok: 2)
+  get (notneeded: 5)
   run (ok: 1)
   save (ok: 1)
-2026-11-13T01:53:35+0000 [INFO    ] con-duct: Summary:
+2026-11-13T02:10:19+0000 [INFO    ] con-duct: Summary:
 Exit Code: 0
-Command: datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./code/assets.tsv --input ./sourcedata/assets.jsonld --input ./sourcedata/dandiset.yaml --output ./sourcedata/000006 --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'
+Command: datalad containers-run --container-name dandi-validation --explicit --message pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0: dandi validate (streaming) of Dandiset 000006 (draft) --input ./code/run.sh --input ./code/name-default.json --input ./sourcedata/assets.jsonld --input ./sourcedata/000006/dandiset.yaml --output ./sourcedata/000006 --output ./derivatives bash './code/run.sh' '.' '000006' './code/name-default.json'
 Log files location: ./logs/duct_
-Wall Clock Time: 19.233 sec
+Wall Clock Time: 17.814 sec
 Memory Peak Usage (RSS): 1.5 GB
-Memory Average Usage (RSS): 709.0 MB
-Virtual Memory Peak Usage (VSZ): 8.6 GB
-Virtual Memory Average Usage (VSZ): 4.8 GB
+Memory Average Usage (RSS): 741.7 MB
+Virtual Memory Peak Usage (VSZ): 1.1 TB
+Virtual Memory Average Usage (VSZ): 127.2 GB
 Memory Peak Percentage: 8.30%
-Memory Average Percentage: 3.84%
-CPU Peak Usage: 481.00%
-Average CPU Usage: 242.38%
+Memory Average Percentage: 3.99%
+CPU Peak Usage: 454.60%
+Average CPU Usage: 258.06%
 

@@ -96,14 +96,26 @@ def test_capsule_keeps_the_manifest_it_validates_as_sourcedata(
     capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
     assert capsule.manifest_path == capsule.path / "sourcedata" / "assets.jsonld"
     assert capsule.manifest_path.read_bytes() == assets_jsonld
-    assert (capsule.sourcedata_directory / "dandiset.yaml").read_bytes() == dandiset_yaml
-    assert not (capsule.code_directory / "dandiset.yaml").exists()
+    assert (capsule.sourcedata_directory / "000123" / "dandiset.yaml").read_bytes() == dandiset_yaml
+    # Only the manifest and dandiset.yaml, from which the run mints the dataset, and no table of them.
+    assert sorted(
+        path.relative_to(capsule.sourcedata_directory).as_posix() for path in capsule.sourcedata_directory.rglob("*")
+    ) == [
+        "000123",
+        "000123/dandiset.yaml",
+        "assets.jsonld",
+    ]
+    assert sorted(path.name for path in capsule.code_directory.iterdir() if not path.name.startswith("submitted_")) == [
+        "name-default.json",
+        "run.sh",
+        "submit.sh",
+    ]
     # A manifest that was not downloaded from S3 has no URL.
     assert read_provenance(capsule.path)["sourcedata"] == {
         "path": "sourcedata",
         "manifest": "sourcedata/assets.jsonld",
         "manifest_url": None,
-        "dandiset_yaml": "sourcedata/dandiset.yaml",
+        "dandiset_yaml": "sourcedata/000123/dandiset.yaml",
         "dandiset_yaml_url": None,
         "dataset": "sourcedata/000123",
     }

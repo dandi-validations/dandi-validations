@@ -21,15 +21,15 @@ https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
 ├── dataset_description.json  ← the derivative dataset that collects the capsules
 └── {{ capsule_pattern }}/  ← submodule: branch {tag} of this repository
     ├── dataset_description.json  ← a study dataset: the provenance of its latest run
-    ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters
-    │            and assets.tsv (the files that were validated)
+    ├── code/  ← the exact code: submit.sh, run.sh and the parameters
     ├── logs/  ← all runtime records for success or failure: duct's usage and
     │            output, the image's versions, the GitHub Actions run
     ├── derivatives/  ← present only when the validation completed: validation.jsonl, all the
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
     ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of {{ codebase_url }})
-    └── sourcedata/  ← the run's input: the manifest (assets.jsonld) and dandiset.yaml, as downloaded
-                       from S3, and its output in {{ dandiset_id }}/: the dataset minted from them and validated
+    └── sourcedata/  ← the run's input, the manifest (assets.jsonld) as downloaded from S3, and in
+                       {{ dandiset_id }}/ the dataset the run mints from it and validates, around
+                       its dandiset.yaml as downloaded
 ```
 
 A capsule holds the latest validation of the Dandiset with its image and version of DANDI Validations.

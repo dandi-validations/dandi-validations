@@ -12,8 +12,9 @@ Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its
         ├── logs/  ← all runtime records of that run, for success or failure
         ├── derivatives/  ← the validation results (only for a completed run)
         ├── envs/  ← the image's registration
-        └── sourcedata/  ← the Dandiset's manifest, as downloaded from S3 (the run's input), and
-                           the dataset the run mints from it and validates (its output)
+        └── sourcedata/  ← the Dandiset's manifest, as downloaded from S3 (the run's input), and in
+                           {dandiset_id}/ the dataset the run mints from it and validates (its
+                           output), around the Dandiset's dandiset.yaml, as downloaded (an input)
 
 ``{tag}`` is the dandi-validation image's tag (its validator version code), followed by ``-v`` and
 the version of dandi-validations that formed the capsule. Each capsule is a DataLad dataset on the
@@ -37,16 +38,7 @@ import socket
 import subprocess
 
 from ._globals import CODEBASE_URL, DANDI_ARCHIVE_URL, DEFAULT_PARAMS_KEY, ORGANIZATION, PROVENANCE_KEY
-from ._manifest import (
-    ManifestFile,
-    assets_table_bytes,
-    fetch_assets_jsonld,
-    fetch_dandiset_yaml,
-    parse_assets_jsonld,
-    select_assets,
-    skipped_table_bytes,
-    source_digest,
-)
+from ._manifest import ManifestFile, fetch_assets_jsonld, fetch_dandiset_yaml, parse_assets_jsonld, source_digest
 from ._pipeline import (
     CAPSULE_CODE_DIRECTORY,
     TEMPLATES_DIRECTORY,
@@ -62,7 +54,7 @@ from ._version_code import parse_version_code
 SOURCEDATA = "sourcedata"
 CAPSULE_CONTENTS = ("code", "logs", "derivatives", "intermediate", SOURCEDATA)
 SUBMITTED_MARKER_PREFIX = "submitted_date-"
-# As the archive lays them out on S3, in dandisets/{dandiset_id}/{version}/.
+# As the archive names it on S3, in dandisets/{dandiset_id}/{version}/.
 MANIFEST_PATH = "assets.jsonld"
 DANDISET_YAML = "dandiset.yaml"
 DATASET_DESCRIPTION = "dataset_description.json"
@@ -218,6 +210,19 @@ class Capsule:
 
         """
         return self.sourcedata_directory / self.dandiset_id
+
+    @property
+    def dandiset_yaml_path(self) -> pathlib.Path:
+        """
+        Locate the Dandiset's ``dandiset.yaml``, at the root of the dataset the run mints.
+
+        Returns
+        -------
+        pathlib.Path
+            The file.
+
+        """
+        return self.source_dataset_directory / DANDISET_YAML
 
     @property
     def submit_script_path(self) -> pathlib.Path:
@@ -433,14 +438,8 @@ class CapsulePlan:
         The Dandiset's manifest.
     dandiset_yaml : ManifestFile
         The Dandiset's metadata.
-    assets_table : bytes
-        The TSV of the assets to register.
-    skipped_table : bytes or None
-        The TSV of the skipped assets, if any.
     number_of_assets : int
-        How many assets are registered.
-    number_of_skipped_assets : int
-        How many assets are skipped.
+        How many assets the manifest lists, each of which the run registers.
 
     """
 
@@ -450,10 +449,7 @@ class CapsulePlan:
     inputs: dict
     assets_jsonld: ManifestFile
     dandiset_yaml: ManifestFile
-    assets_table: bytes
-    skipped_table: bytes | None
     number_of_assets: int
-    number_of_skipped_assets: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -488,7 +484,7 @@ def plan_capsule(  # noqa: PLR0913
     Read a Dandiset's manifest and work out the capsule of the pinned image and this code's version.
 
     The inputs that identify a run are the Dandiset version, the image's version code, the
-    parameter set, and the digest of the Dandiset's registered assets and metadata.
+    parameter set, and the digest of the Dandiset's files (each asset's path, size and SHA-256) and metadata.
 
     Parameters
     ----------
@@ -526,19 +522,15 @@ def plan_capsule(  # noqa: PLR0913
         else ManifestFile(content=dandiset_yaml)
     )
 
-    rows, skipped = select_assets(parse_assets_jsonld(manifest.content))
-    if not rows:
-        reason = f"Dandiset {dandiset_id} ({dandiset_version}) has no assets that can be streamed"
-        if skipped:
-            reason += f" ({len(skipped)} skipped: {sorted({row.reason for row in skipped})})"
-        return reason + "."
+    assets = parse_assets_jsonld(manifest.content)
+    if not assets:
+        return f"Dandiset {dandiset_id} ({dandiset_version}) has no assets."
 
-    assets_table = assets_table_bytes(rows)
     inputs = {
         "dandiset_version": dandiset_version,
         "version": pipeline.container_version,
         "params": parameters.identifier,
-        "source_digest": source_digest(assets_table=assets_table, dandiset_yaml=metadata.content),
+        "source_digest": source_digest(assets=assets, dandiset_yaml=metadata.content),
     }
     capsule = Capsule(
         repository_root=repository_root,
@@ -553,10 +545,7 @@ def plan_capsule(  # noqa: PLR0913
         inputs=inputs,
         assets_jsonld=manifest,
         dandiset_yaml=metadata,
-        assets_table=assets_table,
-        skipped_table=skipped_table_bytes(skipped) if skipped else None,
-        number_of_assets=len(rows),
-        number_of_skipped_assets=len(skipped),
+        number_of_assets=len(assets),
     )
 
 
@@ -586,9 +575,10 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
     Replace a capsule's code, source data and results with the next run's, and record its provenance.
 
     Only what a run writes is replaced. The capsule's dataset, image registration and history stay.
-    The Dandiset's manifest and metadata are written to ``sourcedata/`` as they were downloaded,
-    as the run's inputs. Annexing the manifest needs git-annex (see ``annex_manifest``). The run
-    mints the dataset it validates from them, in ``sourcedata/{dandiset_id}/``.
+    The Dandiset's manifest and metadata are written as they were downloaded, as the run's inputs:
+    the manifest to ``sourcedata/``, and ``dandiset.yaml`` to ``sourcedata/{dandiset_id}/``, where
+    the run mints the rest of the dataset it validates. Annexing the manifest needs git-annex (see
+    ``annex_manifest``).
 
     Parameters
     ----------
@@ -611,14 +601,12 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
 
     image_digest = resolve_digest(image=pipeline.container_image, tag=pipeline.container_version)
     sourcedata = _write_sourcedata(capsule=capsule, assets_jsonld=plan.assets_jsonld, dandiset_yaml=plan.dandiset_yaml)
-    assets_file_name = _write_code(
+    _write_code(
         capsule=capsule,
         pipeline=pipeline,
         image_digest=image_digest,
         parameters=plan.parameters,
         dandiset_version=plan.inputs["dandiset_version"],
-        assets_table=plan.assets_table,
-        skipped_table=plan.skipped_table,
         now=now,
     )
     codebase_version = _codebase_version(pipeline.codebase_version)
@@ -634,8 +622,6 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
         "pipeline": pipeline.pipeline,
         "params_key": plan.parameters.key,
         "assets": plan.number_of_assets,
-        "skipped_assets": plan.number_of_skipped_assets,
-        "assets_file": f"code/{assets_file_name}",
         "dandi_cli": {
             "commit": pipeline.dandi_cli_commit,
             "code_url": pipeline.dandi_cli_code_url,
@@ -712,14 +698,14 @@ def prepare_capsule(  # noqa: PLR0913
 
 
 def _write_sourcedata(*, capsule: Capsule, assets_jsonld: ManifestFile, dandiset_yaml: ManifestFile) -> dict:
-    capsule.manifest_path.parent.mkdir(parents=True)
+    capsule.dandiset_yaml_path.parent.mkdir(parents=True)
     capsule.manifest_path.write_bytes(assets_jsonld.content)
-    (capsule.sourcedata_directory / DANDISET_YAML).write_bytes(dandiset_yaml.content)
+    capsule.dandiset_yaml_path.write_bytes(dandiset_yaml.content)
     return {
         "path": SOURCEDATA,
-        "manifest": f"{SOURCEDATA}/{MANIFEST_PATH}",
+        "manifest": capsule.manifest_path.relative_to(capsule.path).as_posix(),
         "manifest_url": assets_jsonld.url,
-        "dandiset_yaml": f"{SOURCEDATA}/{DANDISET_YAML}",
+        "dandiset_yaml": capsule.dandiset_yaml_path.relative_to(capsule.path).as_posix(),
         "dandiset_yaml_url": dandiset_yaml.url,
         "dataset": capsule.source_dataset_directory.relative_to(capsule.path).as_posix(),
     }
@@ -732,17 +718,11 @@ def _write_code(  # noqa: PLR0913
     image_digest: str | None,
     parameters: ParameterSet,
     dandiset_version: str,
-    assets_table: bytes,
-    skipped_table: bytes | None,
     now: datetime.datetime,
-) -> str:
+) -> None:
     code_directory = capsule.code_directory
     code_directory.mkdir(parents=True)
 
-    assets_file_path = code_directory / "assets.tsv"
-    assets_file_path.write_bytes(assets_table)
-    if skipped_table is not None:
-        (code_directory / "skipped_assets.tsv").write_bytes(skipped_table)
     params_file_path = code_directory / parameters.file_path.name
     shutil.copyfile(parameters.file_path, params_file_path)
     shutil.copyfile(CAPSULE_CODE_DIRECTORY / "run.sh", code_directory / "run.sh")
@@ -762,7 +742,6 @@ def _write_code(  # noqa: PLR0913
         sif_url=pipeline.sif_url,
         sif_release_url=pipeline.sif_release_url,
         params_file_name=params_file_path.name,
-        assets_file_name=assets_file_path.name,
     )
     capsule.submit_script_path.write_text(submit_script)
     for name in ("submit.sh", "run.sh"):
@@ -770,4 +749,3 @@ def _write_code(  # noqa: PLR0913
 
     marker_name = f"{SUBMITTED_MARKER_PREFIX}{now:%Y+%m+%d}_time-{now:%H+%M+%S}"
     (code_directory / marker_name).write_text(_claim_identifier() + "\n")
-    return assets_file_path.name

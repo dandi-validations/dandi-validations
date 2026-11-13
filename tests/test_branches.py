@@ -129,15 +129,13 @@ def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path: pathlib.Path, monk
     assert dot_git.is_file() or dot_git.is_symlink()
     assert str(capsule.path) in git("worktree", "list", cwd=world.runner)
     assert git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
-    # sourcedata/ holds the run's inputs: the manifest and dandiset.yaml, as downloaded. The run
-    # mints the dataset it validates beside them. The example's manifest is a frozen copy, which no
-    # URL serves, so the git-annex branch records nothing and is not pushed.
-    assert (capsule.sourcedata_directory / "dandiset.yaml").read_bytes() == (
-        EXAMPLE_MANIFEST_DIRECTORY / "dandiset.yaml"
-    ).read_bytes()
+    # sourcedata/ holds the run's inputs: the manifest, and the dandiset.yaml of the dataset the run
+    # mints around it, as downloaded. The example's manifest is a frozen copy, which no URL serves,
+    # so the git-annex branch records nothing and is not pushed.
+    assert capsule.dandiset_yaml_path.read_bytes() == (EXAMPLE_MANIFEST_DIRECTORY / "dandiset.yaml").read_bytes()
     assert capsule.manifest_path.read_bytes() == (EXAMPLE_MANIFEST_DIRECTORY / "assets.jsonld").read_bytes()
     assert capsule.manifest_path.is_symlink()
-    assert not capsule.source_dataset_directory.exists()
+    assert list(capsule.source_dataset_directory.iterdir()) == [capsule.dandiset_yaml_path]
     assert set(remote_heads(root=world.runner, remote="origin")) == {"main", capsule.tag}
 
 
@@ -157,7 +155,7 @@ def test_another_runner_gets_the_capsule_back(tmp_path: pathlib.Path, monkeypatc
     recursive = tmp_path / "recursive"
     subprocess.run(["git", "clone", "--quiet", "--recurse-submodules", REPOSITORY_URL, str(recursive)], check=True)
     assert (recursive / capsule.name / "code" / "submit.sh").exists()
-    assert (recursive / capsule.name / "sourcedata" / "dandiset.yaml").exists()
+    assert (recursive / capsule.name / "sourcedata" / EXAMPLE_DANDISET_ID / "dandiset.yaml").exists()
 
 
 @pytest.mark.ai_generated

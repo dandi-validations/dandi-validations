@@ -66,6 +66,8 @@ REGENERATE = os.environ.get("DANDI_VALIDATIONS_REGENERATE_EXPECTED_OUTPUT") == "
 # What the run writes into a claimed capsule, and what it changes there: `datalad containers-add`
 # registers the image in the capsule's DataLad configuration.
 RUN_OUTPUTS = ("logs/", "derivatives/", "envs/", f"sourcedata/{EXAMPLE_DANDISET_ID}/")
+# The claim writes the dataset's dandiset.yaml, an input, and the run mints the rest around it.
+CLAIMED_INPUTS = (f"sourcedata/{EXAMPLE_DANDISET_ID}/dandiset.yaml",)
 CHANGED_BY_RUN = (".datalad/config",)
 # These logs hold progress output and samples taken while the run goes. Their expected copies show
 # one run, and only their presence is checked.
@@ -331,7 +333,11 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
     actual_files = {path.relative_to(actual) for path in actual.rglob("*") if path.is_file()}
     expected_files = {path.relative_to(expected) for path in expected.rglob("*") if path.is_file()}
     if claimed:
-        expected_files = {path for path in expected_files if not _branch_path(path).startswith(RUN_OUTPUTS)}
+        expected_files = {
+            path
+            for path in expected_files
+            if not _branch_path(path).startswith(RUN_OUTPUTS) or _branch_path(path) in CLAIMED_INPUTS
+        }
     assert actual_files == expected_files, (
         f"File trees differ.\nMissing: {sorted(map(str, expected_files - actual_files))}\n"
         f"Unexpected: {sorted(map(str, actual_files - expected_files))}"
@@ -408,8 +414,10 @@ def test_validated_capsule_matches_expected_output(
     # The run registered each file it minted in the clone's one git-annex, whose branch records
     # where each file downloads from for every clone.
     recorded = git("log", "--patch", "git-annex", cwd=world.repository)
-    validated = git("show", f"{pipeline.tag}:code/assets.tsv", cwd=world.repository).splitlines()[1:]
-    assert [row.split("\t")[3] for row in validated if row.split("\t")[3] not in recorded] == []
+    manifest = json.loads((EXAMPLE_MANIFEST_DIRECTORY / "assets.jsonld").read_text())
+    blobs = [url for asset in manifest for url in asset["contentUrl"] if "/blobs/" in url]
+    assert len(blobs) == len(manifest)
+    assert [url for url in blobs if url not in recorded] == []
 
     # A second run finds the successful capsule and does nothing.
     with caplog.at_level(logging.INFO):

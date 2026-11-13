@@ -12,9 +12,9 @@
 # Run from anywhere inside the capsule's dataset. This registers the container with
 # datalad-container and executes code/run.sh in it through Apptainer with
 # `datalad containers-run`, wrapped in duct to record resource usage. The run commit records the
-# command, its inputs (the code and the Dandiset's manifest in sourcedata/) and its outputs (the
-# dataset it mints from the manifest in sourcedata/{{ dandiset_id }}/, and derivatives/). duct's
-# records go to logs/.
+# command, its inputs (the code, and the Dandiset's manifest and dandiset.yaml in sourcedata/) and
+# its outputs (the files it mints from the manifest in sourcedata/{{ dandiset_id }}/, and
+# derivatives/). duct's records go to logs/.
 #
 # A failed run must not leave a partial output behind, since any file under the capsule's
 # derivatives/ marks it successful. Its logs are kept either way, which marks it failed.
@@ -116,9 +116,8 @@ duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "{{ capsule
         --message "{{ capsule_name }}: dandi validate (streaming) of Dandiset ${DANDISET_ID} ({{ dandiset_version }})" \
         --input "${CAPSULE}/code/run.sh" \
         --input "${CAPSULE}/code/{{ params_file_name }}" \
-        --input "${CAPSULE}/code/{{ assets_file_name }}" \
         --input "${CAPSULE}/sourcedata/assets.jsonld" \
-        --input "${CAPSULE}/sourcedata/dandiset.yaml" \
+        --input "${CAPSULE}/sourcedata/${DANDISET_ID}/dandiset.yaml" \
         --output "${CAPSULE}/sourcedata/${DANDISET_ID}" \
         --output "${CAPSULE}/derivatives" \
         "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/{{ params_file_name }}'" &
@@ -134,8 +133,9 @@ fi
 if [ "$run_status" -ne 0 ]; then
     rm -rf "${CAPSULE}/derivatives"
     # `datalad addurls --nosave` staged what the run minted, which only a completed run commits.
-    git rm -r -q --cached --ignore-unmatch -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
-    rm -rf "${CAPSULE:?}/sourcedata/${DANDISET_ID:?}"
+    # The dataset is left as it was claimed, with only its dandiset.yaml.
+    git reset -q -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
+    git clean -q -d -f -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
     # On failure, datalad leaves the run record it would have committed in COMMIT_EDITMSG (in the
     # git directory, which for a worktree is not .git/).
     commit_message="$(git rev-parse --git-dir)/COMMIT_EDITMSG"

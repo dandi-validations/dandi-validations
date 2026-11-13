@@ -26,14 +26,7 @@ from ._capsule import (
 )
 from ._capsule_table import CAPSULE_TABLE_COLUMNS, capsule_row, read_capsule_table
 from ._collect import collect, write_records
-from ._manifest import (
-    ManifestFile,
-    assets_table_bytes,
-    fetch_assets_jsonld,
-    parse_assets_jsonld,
-    select_assets,
-    source_digest,
-)
+from ._manifest import ManifestFile, fetch_assets_jsonld, parse_assets_jsonld, source_digest
 from ._pipeline import CAPSULE_CODE_DIRECTORY, PIPELINE_FILE_PATH, TEMPLATES_DIRECTORY, Pipeline, load_pipeline
 from ._registry import DIGEST_OVERRIDE_VARIABLE, resolve_digest
 from ._repositories import (
@@ -68,7 +61,6 @@ __all__ = [
     "Pipeline",
     "PrepareResult",
     "VersionCodeError",
-    "assets_table_bytes",
     "build_capsule_tag",
     "build_version_code",
     "capsule_branches",
@@ -95,7 +87,6 @@ __all__ = [
     "render_template",
     "resolve_digest",
     "run_job",
-    "select_assets",
     "semantic_version",
     "source_digest",
     "sync_repository",

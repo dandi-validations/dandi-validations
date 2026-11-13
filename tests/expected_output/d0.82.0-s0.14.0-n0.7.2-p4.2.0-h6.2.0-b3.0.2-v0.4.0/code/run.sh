@@ -7,11 +7,12 @@
 #
 # Usage: run.sh CAPSULE_DIRECTORY DANDISET_ID PARAMETERS_FILE
 #
-#   1. Mint a DataLad dataset of the Dandiset in the capsule's sourcedata/DANDISET_ID/, from
-#      sourcedata/dandiset.yaml and code/assets.tsv (the files that the archive's S3 manifest,
-#      sourcedata/assets.jsonld, lists as streamable). Each file is annexed in the capsule by its
-#      SHA-256 key, with its S3 URL, and nothing is downloaded. `datalad containers-run` records
-#      the dataset as an output of the run, beside the manifest as its input.
+#   1. Mint a DataLad dataset of the Dandiset in the capsule's sourcedata/DANDISET_ID/, around its
+#      dandiset.yaml, from the archive's S3 manifest, sourcedata/assets.jsonld. Each asset is
+#      annexed in the capsule by its SHA-256 key, with the URL of its blob on S3, and nothing is
+#      downloaded. An asset without both (e.g., a Zarr asset) cannot be streamed, and fails the
+#      run. `datalad containers-run` records the files as an output of the run, and the manifest
+#      and dandiset.yaml as its inputs.
 #   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
 #   3. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
@@ -28,8 +29,8 @@ CAPSULE_DIRECTORY="$1"
 DANDISET_ID="$2"
 PARAMETERS_FILE="$3"
 
-CODE_DIRECTORY="${CAPSULE_DIRECTORY}/code"
 SOURCEDATA_DIRECTORY="${CAPSULE_DIRECTORY}/sourcedata"
+MANIFEST="${SOURCEDATA_DIRECTORY}/assets.jsonld"
 INTERMEDIATE_DIRECTORY="${CAPSULE_DIRECTORY}/intermediate"
 OUTPUT_DIRECTORY="${CAPSULE_DIRECTORY}/derivatives"
 SOURCE_DATASET="${SOURCEDATA_DIRECTORY}/${DANDISET_ID}"
@@ -45,8 +46,10 @@ MIN_SEVERITY="$(parameter min_severity)"
 
 export DANDI_NO_ET=1
 
-rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY" "$SOURCE_DATASET"
+rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY"
 mkdir -p "$INTERMEDIATE_DIRECTORY"
+# What an earlier run minted goes, but dandiset.yaml is an input.
+find "$SOURCE_DATASET" -mindepth 1 ! -path "${SOURCE_DATASET}/dandiset.yaml" -delete
 
 # Apptainer binds the host's home directory, and with it the host's git configuration (signing
 # programs, hooks, ...). git and git-annex run here with a configuration of their own.
@@ -66,16 +69,34 @@ python -c \
     /opt/dandi-validation/versions.json \
     || echo "(no version record in this image)"
 
+# The fields of each asset that `datalad addurls` needs, as it reads them: a flat JSON record.
+addurls_records() {
+    python - "$MANIFEST" << 'EOF'
+import json
+import sys
+
+records = []
+unsupported = []
+for asset in json.load(open(sys.argv[1])):
+    sha256 = asset.get("digest", {}).get("dandi:sha2-256")
+    blobs = [url for url in asset.get("contentUrl", []) if "amazonaws.com" in url and "/blobs/" in url]
+    if sha256 and blobs:
+        records.append({"path": asset["path"], "size": str(asset["contentSize"]), "sha256": sha256, "url": blobs[0]})
+    else:
+        unsupported.append(asset.get("path"))
+if unsupported:
+    sys.exit(f"{len(unsupported)} assets have no SHA-256 digest or no blob on S3, so they cannot be streamed: {unsupported}")
+json.dump(records, sys.stdout)
+EOF
+}
+
 echo "=== Minting the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="
-ASSETS_TABLE="${CODE_DIRECTORY}/assets.tsv"
-mkdir -p "$SOURCE_DATASET"
-cp "${SOURCEDATA_DIRECTORY}/dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
 # Unsaved, so that `datalad containers-run` saves the files in the run's own commit.
-datalad addurls -d "$CAPSULE_DIRECTORY" --nosave --input-type tsv --exclude-autometa '.*' \
+addurls_records | datalad addurls -d "$CAPSULE_DIRECTORY" --nosave --exclude-autometa '.*' \
     --key 'et:SHA256-s{size}--{sha256}' \
-    "$ASSETS_TABLE" '{url}' "sourcedata/${DANDISET_ID}/{path}"
+    - '{url}' "sourcedata/${DANDISET_ID}/{path}"
 # addurls only logs a URL it failed to register, and a file without one cannot be streamed.
-listed="$(( $(wc -l < "$ASSETS_TABLE") - 1 ))"
+listed="$(python -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$MANIFEST")"
 registered="$(git -C "$SOURCE_DATASET" annex find --in=web | wc -l)"
 echo "Registered ${registered} of ${listed} files with their S3 URLs (none downloaded)."
 if [ "$registered" -ne "$listed" ]; then

@@ -38,7 +38,7 @@
     "dandiset_version": "draft",
     "version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
     "params": "859c878",
-    "source_digest": "236011cd20767b3c486a012866af645f0af7adb5049bdffc06bca32ca78f843a",
+    "source_digest": "76c785d5cc5125e4ee7968a4104c84d3656afcd5c4da47443403f9352c58131f",
     "validator_versions": {
       "dandi": "0.82.0",
       "dandischema": "0.14.0",
@@ -54,15 +54,13 @@
       "path": "sourcedata",
       "manifest": "sourcedata/assets.jsonld",
       "manifest_url": null,
-      "dandiset_yaml": "sourcedata/dandiset.yaml",
+      "dandiset_yaml": "sourcedata/000006/dandiset.yaml",
       "dandiset_yaml_url": null,
       "dataset": "sourcedata/000006"
     },
     "pipeline": "dandi+validate",
     "params_key": "default",
     "assets": 6,
-    "skipped_assets": 0,
-    "assets_file": "code/assets.tsv",
     "dandi_cli": {
       "commit": "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
       "code_url": "https://github.com/dandi/dandi-cli/tree/bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
