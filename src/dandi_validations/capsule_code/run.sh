@@ -8,8 +8,10 @@
 # Usage: run.sh CAPSULE_DIRECTORY DANDISET_ID PARAMETERS_FILE
 #
 #   1. Build a DataLad dataset of the Dandiset from code/assets.tsv (derived from the archive's
-#      assets.jsonld on S3): each file gets its SHA-256 git-annex key and its S3 URL, and
-#      nothing is downloaded.
+#      assets.jsonld on S3, which the capsule keeps in sourcedata/.dandi/) and
+#      sourcedata/dandiset.yaml: each file gets its SHA-256 git-annex key and its S3 URL, and
+#      nothing is downloaded. The capsule's sourcedata/ holds the same files, registered the
+#      same way.
 #   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
 #   3. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
@@ -27,6 +29,7 @@ DANDISET_ID="$2"
 PARAMETERS_FILE="$3"
 
 CODE_DIRECTORY="${CAPSULE_DIRECTORY}/code"
+SOURCEDATA_DIRECTORY="${CAPSULE_DIRECTORY}/sourcedata"
 INTERMEDIATE_DIRECTORY="${CAPSULE_DIRECTORY}/intermediate"
 OUTPUT_DIRECTORY="${CAPSULE_DIRECTORY}/derivatives"
 SOURCE_DATASET="${INTERMEDIATE_DIRECTORY}/${DANDISET_ID}"
@@ -61,7 +64,7 @@ python -c \
 echo "=== Building the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="
 ASSETS_TABLE="${CODE_DIRECTORY}/assets.tsv"
 datalad create -c text2git "$SOURCE_DATASET"
-cp "${CODE_DIRECTORY}/dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
+cp "${SOURCEDATA_DIRECTORY}/dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
 datalad save -d "$SOURCE_DATASET" -m "Add dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
 datalad addurls -d "$SOURCE_DATASET" --input-type tsv --exclude-autometa '.*' \
     --key 'et:SHA256-s{size}--{sha256}' \

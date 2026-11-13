@@ -21,34 +21,44 @@ https://github.com/dandi-validations/{dandiset_id}/   (main)
 ├── dataset_description.json  ← the derivative dataset that collects the capsules
 └── pipeline-dandi+validate_tag-{tag}/  ← submodule: branch {tag} of this repository
     ├── dataset_description.json  ← a study dataset: the provenance of its latest run
-    ├── code/  ← assets.tsv, dandiset.yaml, name-default.json, run.sh,
+    ├── code/  ← assets.tsv, name-default.json, run.sh,
     │            submit.sh, submitted_date-... (claim marker)
     ├── logs/  ← duct_info.json, duct_usage.jsonl, duct_stdout, duct_stderr,
     │            container_versions.json, run.json, submit.log
     ├── derivatives/  ← validation.jsonl, as `dandi validate` writes it (plain text),
     │                   and validation_summary.txt, its `--summary`
     ├── envs/dandi-validation/image  ← the image's registration (annexed, with its content on GHCR and in a release here)
-    └── sourcedata/  ← subdataset: https://github.com/dandisets/{dandiset_id} at its draft head
+    └── sourcedata/  ← the Dandiset as validated, built from its S3 manifest
+        ├── dandiset.yaml  ← as downloaded from S3
+        ├── .dandi/assets.jsonld  ← the manifest, as downloaded from S3 (annexed, with its content on S3)
+        └── sub-.../...  ← every file validated (annexed, with its content on S3)
 ```
 
 - **Capsules on tag branches.** Each capsule is a DataLad dataset on the branch named by its tag. That is its image's tag, followed by `-v` and the version of dandi-validations that formed it, e.g. `d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0`. The branch holds `code/`, `logs/` and `derivatives/` at its root, the registration of its image (`envs/dandi-validation/image`, annexed), and the `[DATALAD RUNCMD]` record of every run, so `datalad rerun` reproduces any of them in any clone. Branches are never merged. A new version of dandi-validations starts new branches. A capsule holds the latest validation of the Dandiset with its image and version of this code: a new run (after the Dandiset's files change, or a failure) replaces its contents in a new commit, so the branch's history keeps every earlier run.
 - **Two `dataset_description.json`.** `main`'s describes the repository as a derivative dataset collecting the capsules. The template sync manages it. Each capsule's describes the capsule as a BIDS study dataset: it holds its raw data under `sourcedata/` and its results under `derivatives/`. A job writes it with the provenance of the run:
   - `GeneratedBy` names dandi-cli, the image in BIDS's `Container` (tag and digest), and this code.
-  - `SourceDatasets` names the Dandiset and the mirror commit `sourcedata/` pins.
-  - `DandiValidations` holds the run's inputs, image and six validator versions.
-- **sourcedata/** in each capsule is a subdataset (git submodule) of DANDI's DataLad mirror, `https://github.com/dandisets/{dandiset_id}`, pinned to its `draft` head when the run was formed. It is there for provenance and self-containment only: it is read with `git ls-remote` and never fetched, and the validation reads the Dandiset through the dataset built from the S3 manifest.
+  - `SourceDatasets` names the Dandiset.
+  - `DandiValidations` holds the run's inputs, image and six validator versions, and the S3 versions its manifest and `dandiset.yaml` were downloaded from.
+- **sourcedata/** in each capsule holds the Dandiset as the run validated it.
+  Its `dandiset.yaml` and its manifest (`.dandi/assets.jsonld`) are kept as they were downloaded from the archive's S3 bucket.
+  Beside them, each file the run validates is registered as `run.sh` registers it with `datalad addurls` in the dataset it validates, by its SHA-256 key and with its S3 URL.
+  Nothing is downloaded.
+  The manifest is annexed too, since a large Dandiset's manifest can take tens of megabytes.
+  Its URL is that of the S3 version it was downloaded from, which stays downloadable after the draft changes.
 - **main** holds one git submodule per tag branch that has content, pointing at this same repository and branch, pinned to the branch's latest commit. If a branch is deleted, the next run removes its submodule.
 - **Status** is read from what a capsule holds: *pending* (code only), *stalled* (claimed, nothing logged), *failed* (logs, no results), *successful* (results under `derivatives/`).
 - **One clone, one annex.** On a runner, every capsule branch is a `git worktree` of the single clone of the repository, checked out at its submodule's path, so all of them share one object store and one git-annex. git-annex is initialized with `annex.private`, so ephemeral clones leave no trace.
-- **Where the image downloads from.** Besides GHCR, each SIF is published as the release `sif-{version code}` of this repository, which needs no token to download. After a run, the job records that release's URL for the image's git-annex key, but only if the SHA-256 published with it matches the key. Each repository's `git-annex` branch holds only those URLs. So `datalad get` fetches a capsule's image in any clone.
+  The capsules of a Dandiset share most of its files, and each file's S3 URL is recorded once for all of them.
+- **Where the image downloads from.** Besides GHCR, each SIF is published as the release `sif-{version code}` of this repository, which needs no token to download. After a run, the job records that release's URL for the image's git-annex key, but only if the SHA-256 published with it matches the key.
+- **Where content downloads from.** Each repository's `git-annex` branch holds only URLs: each image's release, each version of the manifest, and each of the Dandiset's files on S3. So `datalad get` fetches any of them in any clone.
 - **Readable files.** Capsule files are kept in git, uncompressed, so they can be read on GitHub.
-  Only the image is annexed. GitHub refuses files over 100 MiB, so a run whose results would exceed that records no results and is left *failed*, saying so in its logs.
+  Only the image and the files of `sourcedata/` besides `dandiset.yaml` are annexed. GitHub refuses files over 100 MiB, so a run whose results would exceed that records no results and is left *failed*, saying so in its logs.
 
 To get a Dandiset's results:
 
 ```bash
 git clone https://github.com/dandi-validations/000006
-git -C 000006 submodule update --init  # the capsules, not their sourcedata/ (the whole Dandiset)
+git -C 000006 submodule update --init  # the capsules, without the content of their sourcedata/
 dandi validate --load 000006/pipeline-dandi+validate_tag-*/derivatives/validation.jsonl --summary
 ```
 
@@ -66,8 +76,9 @@ datalad rerun "$(git log --format=%H --grep='DATALAD RUNCMD' -1)"  # downloads t
 
 On the runner of `https://github.com/dandi-validations/{dandiset_id}` (its **Validate** workflow), `dandi-validations run`, from a checkout of `main`:
 
-1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`). It checks the capsule's branch (the pinned image's tag and this code's version) out at the capsule's path as a worktree, or starts it as a new DataLad dataset, and links `sourcedata/` to the mirror's current `draft` head. Unless the capsule's latest run already succeeded on the same inputs, it writes the capsule's `code/`: the assets to validate (`assets.tsv`: path, size, SHA-256, S3 URL), `dandiset.yaml`, the parameters, `run.sh` and `submit.sh`. It also resolves the image's digest on GHCR and writes the capsule's `dataset_description.json` with its provenance. The inputs are the Dandiset version, the image's version code, the parameters and a digest of the assets and `dandiset.yaml`.
+1. **Forms the capsule.** It reads the Dandiset's manifest from the archive's S3 bucket (`dandisets/{id}/draft/assets.jsonld` and `dandiset.yaml`), noting the S3 version of each. It checks the capsule's branch (the pinned image's tag and this code's version) out at the capsule's path as a worktree, or starts it as a new DataLad dataset. Unless the capsule's latest run already succeeded on the same inputs, it writes the capsule's `code/`: the assets to validate (`assets.tsv`: path, size, SHA-256, S3 URL), the parameters, `run.sh` and `submit.sh`. It writes the manifest and `dandiset.yaml` to `sourcedata/` as they were downloaded, annexes the manifest and registers every file to validate beside them. It also resolves the image's digest on GHCR and writes the capsule's `dataset_description.json` with its provenance. The inputs are the Dandiset version, the image's version code, the parameters and a digest of the assets and `dandiset.yaml`.
 2. **Claims it.** It commits the capsule to its branch and pushes the branch, then pins `main`'s submodule to it and pushes `main`. A run that never reports back therefore reads as *stalled*.
+   The `git-annex` branch, which now records where the manifest and the Dandiset's files download from, is pushed too.
 3. **Runs `code/submit.sh`** inside the capsule's dataset. The script:
    - pulls the `dandi-validation` SIF from GHCR
    - registers it with `datalad containers-add` (`apptainer exec --cleanenv {img} {cmd}`)
@@ -77,11 +88,11 @@ On the runner of `https://github.com/dandi-validations/{dandiset_id}` (its **Val
    ```bash
    duct --output-prefix "logs/duct_" --fail-time 0 \
        datalad containers-run --container-name dandi-validation --explicit \
-           --input "code/..." --output "derivatives" \
+           --input "code/..." --input "sourcedata/dandiset.yaml" --output "derivatives" \
            "bash './code/run.sh' ..."
    ```
 
-   Inside the container, `run.sh` follows the recipe at the top of [dandi/dandi-cli#1956](https://github.com/dandi/dandi-cli/pull/1956). It builds a DataLad dataset of the Dandiset with `datalad addurls --key 'et:SHA256-s{size}--{sha256}'`, so every file gets its git-annex key and S3 URL and nothing is fetched. It then runs `dandi validate --missing-file-content=stream -J 8 --format json_lines`, and writes its results and a summary to `derivatives/`.
+   Inside the container, `run.sh` follows the recipe at the top of [dandi/dandi-cli#1956](https://github.com/dandi/dandi-cli/pull/1956). It builds a DataLad dataset of the Dandiset with `datalad addurls --key 'et:SHA256-s{size}--{sha256}'`, so every file gets its git-annex key and S3 URL and nothing is fetched. The capsule's `sourcedata/` holds the same files, registered the same way. It then runs `dandi validate --missing-file-content=stream -J 8 --format json_lines`, and writes its results and a summary to `derivatives/`.
 4. **Records it.** duct's records, the image's versions, the GitHub Actions run and the output of `submit.sh` go to `logs/`. They are committed to the branch, and `main`'s submodule is pinned again. Both are pushed.
    The URL of the image's release is recorded in the `git-annex` branch, which is pushed too.
 

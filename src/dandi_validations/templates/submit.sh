@@ -114,7 +114,7 @@ duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "{{ capsule
         --message "{{ capsule_name }}: dandi validate (streaming) of Dandiset ${DANDISET_ID} ({{ dandiset_version }})" \
         --input "${CAPSULE}/code/run.sh" \
         --input "${CAPSULE}/code/{{ params_file_name }}" \
-        --input "${CAPSULE}/code/dandiset.yaml" \
+        --input "${CAPSULE}/sourcedata/dandiset.yaml" \
         --input "${CAPSULE}/code/{{ assets_file_name }}" \
         --output "${CAPSULE}/derivatives" \
         "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/{{ params_file_name }}'" &

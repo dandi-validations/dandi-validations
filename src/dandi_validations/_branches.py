@@ -5,17 +5,19 @@ Each capsule is a DataLad dataset on its own branch of the Dandiset repository, 
 That is its image's tag (the validator version code), then ``-v`` and the version of
 dandi-validations that formed it, e.g. ``d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.2.0``.
 The branch holds ``code/``, ``logs/`` and ``derivatives/`` at its root. It also holds the
-registration of its image (``envs/dandi-validation/image``), ``sourcedata/`` (a subdataset
-linking DANDI's DataLad mirror of the Dandiset), and the ``datalad containers-run`` record of
-every run. Branches are never merged. Each is created when its image and version of
+registration of its image (``envs/dandi-validation/image``), ``sourcedata/`` (the Dandiset as
+validated: its S3 manifest and the dataset built from it), and the ``datalad containers-run``
+record of every run. Branches are never merged. Each is created when its image and version of
 dandi-validations first validate the Dandiset, and later runs add commits to it, so earlier pins
 remain valid.
 
 On a runner, every capsule branch is a ``git worktree`` of the one clone of the repository,
 checked out at the path of its submodule in main. They all share that clone's objects and its
 git-annex. The annex is initialized as private, so nothing about the ephemeral clone is recorded.
-The repository's git-annex branch records only where each capsule's image can be downloaded, so
-that ``datalad get`` and ``datalad rerun`` work in any clone.
+The repository's git-annex branch records only where content can be downloaded: each capsule's
+image, each version of the Dandiset's manifest, and each of its files. ``datalad get`` and
+``datalad rerun`` then work in any clone. The capsules of a Dandiset share most of its files, and
+each file's URL is recorded once for all of them.
 
 ``main`` holds one git submodule ``pipeline-dandi+validate_tag-<tag>`` per capsule branch. Each
 points at the same repository and branch, pinned to the branch's latest commit. A branch that is
@@ -28,24 +30,26 @@ import re
 import urllib.request
 import uuid
 
-from ._capsule import Capsule, capsule_name
+from ._capsule import DANDISET_YAML, SOURCEDATA, Capsule, capsule_name
 from ._git import run
-from ._globals import DANDISETS_URL_TEMPLATE, SOURCEDATA_BRANCH
+from ._manifest import AssetRow
 from ._version_code import is_capsule_tag
 
 _log = logging.getLogger(__name__)
 
-# Only the image is annexed, so everything else in a capsule can be read on GitHub.
+# Only the image and the Dandiset are annexed, so everything else in a capsule can be read on GitHub.
 CAPSULE_GITATTRIBUTES = (
     "* annex.backend=SHA256E\n"
     "* annex.largefiles=nothing\n"
     "# The image is annexed: only its key is recorded; its content is published on GHCR.\n"
     "envs/** annex.largefiles=anything\n"
+    "# The Dandiset's manifest and files are annexed: only their keys are recorded; their content is on S3.\n"
+    f"{SOURCEDATA}/** annex.largefiles=anything\n"
+    f"{SOURCEDATA}/{DANDISET_YAML} annex.largefiles=nothing\n"
     "# The summary only counts what validation.jsonl holds, so GitHub collapses it in diffs.\n"
     "derivatives/validation_summary.txt linguist-generated=true\n"
 )
 CAPSULE_GITIGNORE = "intermediate/\n"
-SOURCEDATA = "sourcedata"
 
 _SHA256_KEY_RE = re.compile(r"SHA256E?-s\d+--(?P<sha256>[0-9a-f]{64})(\..*)?")
 
@@ -188,39 +192,66 @@ def create_capsule(*, main_root: pathlib.Path, capsule: Capsule) -> None:
     run(command=["git", "commit", "--quiet", "-m", f"Start the capsule of {capsule.tag}"], cwd=capsule.path)
 
 
-def link_sourcedata(*, capsule: Capsule, url_template: str | None = None) -> dict | None:
+def annex_sourcedata(*, capsule: Capsule, assets: list[AssetRow], manifest_url: str | None) -> None:
     """
-    Link DANDI's DataLad mirror of the Dandiset as a capsule's ``sourcedata/`` subdataset.
+    Annex a capsule's ``sourcedata/``: the Dandiset's manifest, and a file for each validated asset.
 
-    The submodule is pinned to the mirror's ``draft`` head at this moment, read with
-    ``git ls-remote``, so nothing is fetched. It records what the archive's mirror held when the
-    run was formed, for provenance and self-containment. The validation does not read it.
+    Each asset is registered as ``datalad addurls`` registers it in the dataset that ``run.sh``
+    builds to validate, which ``sourcedata/`` therefore holds too. The file is a link to the
+    asset's SHA-256 key (with the extension of its path, as ``et:SHA256`` asks), and its S3 URL is
+    recorded in the git-annex branch. Nothing is downloaded. The manifest, which was downloaded,
+    is annexed with the URL of the S3 version it was downloaded from, if known.
+
+    The capsule's worktree shares the clone's git-annex, and so the git-annex branch, with main and
+    every other capsule. An asset that another capsule already registered is recorded only once.
 
     Parameters
     ----------
     capsule : Capsule
-        The capsule.
-    url_template : str or None, default=None
-        The mirror's URL, with a ``{dandiset_id}`` field, if not DANDI's.
+        The capsule, whose ``sourcedata/`` holds the manifest as written by ``write_capsule``.
+    assets : list[AssetRow]
+        The assets to register, which are those validated.
+    manifest_url : str or None
+        The URL of the manifest's S3 version, if it was downloaded from S3.
 
-    Returns
-    -------
-    dict or None
-        The link, or ``None`` when the mirror has no such branch (e.g., a Dandiset not mirrored yet).
+    Raises
+    ------
+    RuntimeError
+        If git-annex does not give a key for every asset.
 
     """
-    url = (url_template or DANDISETS_URL_TEMPLATE).format(dandiset_id=capsule.dandiset_id)
-    result = run(command=["git", "ls-remote", url, f"refs/heads/{SOURCEDATA_BRANCH}"], cwd=capsule.path, check=False)
-    commit = result.stdout.split("\t", 1)[0].strip() if result.returncode == 0 else ""
-    if not commit:
-        return None
-    for key, value in (("path", SOURCEDATA), ("url", url), ("branch", SOURCEDATA_BRANCH)):
-        run(command=["git", "config", "-f", ".gitmodules", f"submodule.{SOURCEDATA}.{key}", value], cwd=capsule.path)
-    # As git leaves an uninitialized submodule.
-    (capsule.path / SOURCEDATA).mkdir(exist_ok=True)
-    run(command=["git", "update-index", "--add", "--cacheinfo", f"160000,{commit},{SOURCEDATA}"], cwd=capsule.path)
-    run(command=["git", "add", ".gitmodules"], cwd=capsule.path)
-    return {"path": SOURCEDATA, "url": url, "branch": SOURCEDATA_BRANCH, "commit": commit}
+    manifest = capsule.manifest_path.relative_to(capsule.path).as_posix()
+    run(command=["git", "annex", "add", "--quiet", "--force-large", "--", manifest], cwd=capsule.path)
+    if manifest_url is not None:
+        key = run(command=["git", "annex", "lookupkey", "--", manifest], cwd=capsule.path).stdout.strip()
+        run(command=["git", "annex", "registerurl", key, manifest_url], cwd=capsule.path)
+    else:
+        _log.warning("%s was not downloaded from S3, so no URL is recorded for it.", manifest)
+    if not assets:
+        return
+
+    paths = [f"{SOURCEDATA}/{asset.path}" for asset in assets]
+    examined = run(
+        command=["git", "annex", "examinekey", "--batch", "--migrate-to-backend=SHA256E", "--format=${key}\\n"],
+        cwd=capsule.path,
+        stdin="".join(
+            f"SHA256-s{asset.size}--{asset.sha256} {path}\n" for asset, path in zip(assets, paths, strict=True)
+        ),
+    )
+    keys = examined.stdout.splitlines()
+    if len(keys) != len(assets) or not all(keys):
+        message = f"git-annex gave {len(keys)} keys for {len(assets)} assets:\n{examined.stdout}\n{examined.stderr}"
+        raise RuntimeError(message)
+    run(
+        command=["git", "annex", "registerurl", "--batch"],
+        cwd=capsule.path,
+        stdin="".join(f"{key} {asset.url}\n" for key, asset in zip(keys, assets, strict=True)),
+    )
+    run(
+        command=["git", "annex", "fromkey", "--force", "--batch"],
+        cwd=capsule.path,
+        stdin="".join(f"{key} {path}\n" for key, path in zip(keys, paths, strict=True)),
+    )
 
 
 def _read_url(url: str, /) -> str:

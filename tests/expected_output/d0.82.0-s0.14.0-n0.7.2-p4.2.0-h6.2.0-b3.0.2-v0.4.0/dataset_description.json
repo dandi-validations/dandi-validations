@@ -1,0 +1,74 @@
+{
+  "Name": "DANDI Validations: dandi validate of Dandiset 000006 with ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
+  "BIDSVersion": "1.10.1",
+  "DatasetType": "study",
+  "GeneratedBy": [
+    {
+      "Name": "dandi validate",
+      "Description": "DANDI CLI validation, streaming the content of annexed files through datalad-fuse adapters (https://github.com/dandi/dandi-cli/pull/1956).",
+      "Version": "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
+      "CodeURL": "https://github.com/dandi/dandi-cli/tree/bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e"
+    },
+    {
+      "Name": "DANDI Validations: Container",
+      "Description": "The dandi-validation image, tagged by its validator version code, run through Apptainer with datalad containers-run.",
+      "Version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
+      "CodeURL": "ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "Container": {
+        "Type": "docker",
+        "Tag": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
+        "URI": "docker://ghcr.io/dandi-validations/dandi-validation@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "Name": "DANDI Validations: Code",
+      "Description": "Orchestration of validation jobs on GitHub Actions.",
+      "Version": "v0.4.0+0000000000000000000000000000000000000000",
+      "CodeURL": "https://github.com/dandi-validations/dandi-validations"
+    }
+  ],
+  "SourceDatasets": [
+    {
+      "URL": "https://dandiarchive.org/dandiset/000006/draft",
+      "Version": "draft"
+    }
+  ],
+  "DandiValidations": {
+    "dandiset_id": "000006",
+    "dandiset_version": "draft",
+    "version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
+    "params": "859c878",
+    "source_digest": "85485862335f0f925d220b5f2eb6718da7a98d4a271e2558024cdb9fcd41ccd3",
+    "validator_versions": {
+      "dandi": "0.82.0",
+      "dandischema": "0.14.0",
+      "nwbinspector": "0.7.2",
+      "pynwb": "4.2.0",
+      "hdmf": "6.2.0",
+      "bids-validator-deno": "3.0.2"
+    },
+    "image": "ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "branch": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0",
+    "sourcedata": {
+      "path": "sourcedata",
+      "manifest": "sourcedata/.dandi/assets.jsonld",
+      "manifest_url": null,
+      "dandiset_yaml": "sourcedata/dandiset.yaml",
+      "dandiset_yaml_url": null
+    },
+    "pipeline": "dandi+validate",
+    "params_key": "default",
+    "assets": 53,
+    "skipped_assets": 0,
+    "assets_file": "code/assets.tsv",
+    "dandi_cli": {
+      "commit": "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
+      "code_url": "https://github.com/dandi/dandi-cli/tree/bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
+      "reference": "https://github.com/dandi/dandi-cli/pull/1956"
+    },
+    "codebase": "v0.4.0",
+    "codebase_version": "v0.4.0+0000000000000000000000000000000000000000",
+    "created_at": "2026-11-05T20:31:05+00:00"
+  }
+}

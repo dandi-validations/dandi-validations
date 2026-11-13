@@ -1,8 +1,24 @@
 import pytest
+import requests
 
 from dandi_validations import assets_table_bytes, fetch_assets_jsonld, parse_assets_jsonld, select_assets, source_digest
 
 from .conftest import make_asset
+
+MANIFEST_URL = "https://dandiarchive.s3.amazonaws.com/dandisets/000123/draft/assets.jsonld"
+
+
+class _S3Response:
+    """Answer a download as the archive's S3 bucket does."""
+
+    status_code = 200
+
+    def __init__(self, *, headers: dict[str, str]) -> None:
+        self.content = b"[]"
+        self.headers = headers
+
+    def raise_for_status(self) -> None:
+        """Pass, as the download succeeded."""
 
 
 @pytest.mark.ai_generated
@@ -62,8 +78,36 @@ def test_source_digest_depends_on_assets_and_metadata(assets_table: bytes, dandi
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    ("headers", "expected_url"),
+    [
+        ({"x-amz-version-id": "Ypet.vU_J"}, f"{MANIFEST_URL}?versionId=Ypet.vU_J"),
+        # A bucket without versioning has no version to point at.
+        ({}, None),
+    ],
+    ids=["versioned", "unversioned"],
+)
+def test_fetch_records_the_version_downloaded(
+    monkeypatch: pytest.MonkeyPatch,
+    headers: dict[str, str],
+    expected_url: str | None,
+) -> None:
+    monkeypatch.setattr(requests, "get", lambda *_, **__: _S3Response(headers=headers))
+    manifest = fetch_assets_jsonld(dandiset_id="000123")
+    assert manifest.content == b"[]"
+    assert manifest.url == expected_url
+
+
+@pytest.mark.ai_generated
 @pytest.mark.network
 def test_fetch_real_manifest() -> None:
-    rows, skipped = select_assets(parse_assets_jsonld(fetch_assets_jsonld(dandiset_id="000006")))
+    manifest = fetch_assets_jsonld(dandiset_id="000006")
+    rows, skipped = select_assets(parse_assets_jsonld(manifest.content))
     assert len(rows) >= 50
     assert skipped == []
+    # The version downloaded stays downloadable, whatever the draft becomes.
+    assert manifest.url is not None
+    assert manifest.url.startswith(
+        "https://dandiarchive.s3.amazonaws.com/dandisets/000006/draft/assets.jsonld?versionId=",
+    )
+    assert requests.get(manifest.url, timeout=120).content == manifest.content

@@ -21,15 +21,15 @@ https://github.com/{{ organization }}/{{ dandiset_id }}/   (main)
 ├── dataset_description.json  ← the derivative dataset that collects the capsules
 └── {{ capsule_pattern }}/  ← submodule: branch {tag} of this repository
     ├── dataset_description.json  ← a study dataset: the provenance of its latest run
-    ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters,
-    │            dandiset.yaml and assets.tsv (the files that were validated)
+    ├── code/  ← the exact code and inputs: submit.sh, run.sh, parameters
+    │            and assets.tsv (the files that were validated)
     ├── logs/  ← all runtime records for success or failure: duct's usage and
     │            output, the image's versions, the GitHub Actions run
     ├── derivatives/  ← present only when the validation completed: validation.jsonl, all the
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
     ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of {{ codebase_url }})
-    └── sourcedata/  ← subdataset: DANDI's DataLad mirror of the Dandiset
-                       (https://github.com/dandisets/{{ dandiset_id }}) at its draft head when the run was formed
+    └── sourcedata/  ← the Dandiset as validated: dandiset.yaml and the manifest
+                       (.dandi/assets.jsonld), as downloaded from S3, and every file validated
 ```
 
 A capsule holds the latest validation of the Dandiset with its image and version of DANDI Validations.
@@ -39,7 +39,7 @@ To look at a capsule's results:
 
 ```bash
 git clone https://github.com/{{ organization }}/{{ dandiset_id }}
-git -C {{ dandiset_id }} submodule update --init  # the capsules, not their sourcedata/
+git -C {{ dandiset_id }} submodule update --init  # the capsules, without the content of their sourcedata/
 dandi validate --load {{ dandiset_id }}/{{ capsule_pattern }}/derivatives/validation.jsonl --summary
 ```
 
@@ -57,4 +57,6 @@ datalad rerun "$(git log --format=%H --grep='DATALAD RUNCMD' -1)"  # downloads t
 
 This repository's shared files are managed by [{{ organization }}/dandi-validations]({{ codebase_url }}).
 
-[^sourcedata]: `sourcedata/` is linked for provenance and self-containment only: the validation reads the Dandiset through a dataset built from the archive's S3 manifest, and nothing is fetched from the mirror.
+[^sourcedata]: Each capsule's `sourcedata/` holds that dataset's files, registered the same way, beside the manifest itself.
+The manifest is annexed with the URL of the S3 version it was downloaded from.
+Any of them downloads with `datalad get`.

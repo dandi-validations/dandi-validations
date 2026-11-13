@@ -3,7 +3,7 @@ The expected output of a job on Dandiset 000006, whose S3 manifest is frozen in 
 
 ``tests/expected_output`` holds, branch by branch, what the Dandiset's repository holds after one
 validation. ``main/`` is the repository's main branch. The branch named by the capsule's tag holds
-the capsule, with ``code/``, ``logs/``, ``derivatives/`` and ``sourcedata`` side by side. The jobs
+the capsule, with ``code/``, ``logs/``, ``derivatives/`` and ``sourcedata/`` side by side. The jobs
 run against local stand-ins for GitHub. See tests/README.md.
 
 To regenerate the expected output after an intended change, run these tests with
@@ -98,6 +98,9 @@ _DATASET_ID_RE = re.compile(
 )
 _INTERMEDIATE_PATH_RE = re.compile(r'"[^"]*?/intermediate/')
 _ANNEX_OBJECT_RE = re.compile(r"\.git/annex/objects/\S+")
+# Only the image's key depends on how it was built. The Dandiset's files and manifest have theirs
+# from the frozen example, so sourcedata/ shows them as they are.
+IMAGE_DIRECTORY = "envs/"
 
 
 def git(*arguments: str, cwd: pathlib.Path) -> str:
@@ -135,18 +138,13 @@ class World:
         """Locate the example's repository, https://github.com/dandi-validations/000006."""
         return self.github / "dandi-validations" / EXAMPLE_DANDISET_ID
 
-    @property
-    def mirror(self) -> pathlib.Path:
-        """Locate DANDI's DataLad mirror of the Dandiset, https://github.com/dandisets/000006."""
-        return self.github / "dandisets" / EXAMPLE_DANDISET_ID
-
 
 def make_world(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> World:
     """
     Stand in for github.com with local repositories, so jobs run offline and deterministically.
 
     git rewrites every https://github.com/ URL to a local directory, so the URLs the code records
-    are the real ones. The mirror's draft is one commit of the example's dandiset.yaml.
+    are the real ones.
 
     Returns
     -------
@@ -167,14 +165,6 @@ def make_world(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> Wo
         monkeypatch.setenv(variable, value)
 
     world = World(github=github, runner=tmp_path / "runner")
-    mirror_work = tmp_path / "mirror-work"
-    git("init", "--quiet", "-b", "draft", str(mirror_work), cwd=tmp_path)
-    shutil.copyfile(EXAMPLE_MANIFEST_DIRECTORY / "dandiset.yaml", mirror_work / "dandiset.yaml")
-    git("add", "dandiset.yaml", cwd=mirror_work)
-    git("commit", "--quiet", "-m", "Draft of Dandiset 000006", cwd=mirror_work)
-    world.mirror.parent.mkdir(parents=True)
-    git("clone", "--quiet", "--bare", str(mirror_work), str(world.mirror), cwd=tmp_path)
-
     world.repository.parent.mkdir(parents=True)
     git("init", "--quiet", "--bare", "-b", "main", str(world.repository), cwd=tmp_path)
     sync_work = tmp_path / "sync"
@@ -209,8 +199,6 @@ def labels(world: World, /) -> dict[str, str]:
     for branch, sha in _heads(world.repository).items():
         if branch != "main":
             names[sha] = f"<head of branch {branch}>"
-    for branch, sha in _heads(world.mirror).items():
-        names[sha] = f"<head of dandisets/{EXAMPLE_DANDISET_ID} {branch}>"
     return names
 
 
@@ -232,7 +220,6 @@ def normalize(*, text: str, names: dict[str, str]) -> str:
     for value, name in sorted(names.items(), key=lambda item: -len(item[0])):
         text = text.replace(value, name)
     text = _DATASET_ID_RE.sub(r"\1<datalad dataset id>", text)
-    text = _ANNEX_OBJECT_RE.sub(".git/annex/objects/<annex key of the image>", text)
     return _INTERMEDIATE_PATH_RE.sub('"<capsule>/intermediate/', text)
 
 
@@ -279,6 +266,8 @@ def materialize(*, repository: pathlib.Path, ref: str, destination: pathlib.Path
         else:
             content = git("cat-file", "blob", sha, cwd=repository)
         content = normalize(text=content, names=names)
+        if path.startswith(IMAGE_DIRECTORY):
+            content = _ANNEX_OBJECT_RE.sub(".git/annex/objects/<annex key of the image>", content)
         if path.startswith("logs/") and path.endswith(".json"):
             content = _normalize_log(path=path, text=content)
         if path == "derivatives/validation.jsonl":

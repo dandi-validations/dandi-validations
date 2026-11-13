@@ -114,21 +114,24 @@ assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] =
 # The branch named by the capsule's tag: the capsule at its root (a study dataset), its image's
 # registration and its run record.
 files = set(git("ls-tree", "-r", "--name-only", tag).split())
-assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata"} <= files
+assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata/dandiset.yaml", "sourcedata/.dandi/assets.jsonld"} <= files
 assert {"derivatives/validation.jsonl", "derivatives/validation_summary.txt"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") for path in files), files
 assert json.loads(git("show", f"{tag}:dataset_description.json"))["DatasetType"] == "study"
 assert "[DATALAD RUNCMD]" in git("log", "--format=%s", tag)
-# sourcedata/ links DANDI's DataLad mirror of the Dandiset at its draft head (never fetched).
-sourcedata = git("ls-tree", tag, "sourcedata").split()
-assert sourcedata[:2] == ["160000", "commit"], sourcedata
-assert "url = https://github.com/dandisets/" in git("show", f"{tag}:.gitmodules")
+# sourcedata/ holds the manifest and a link to the annexed key of every file validated.
+links = [line for line in git("ls-tree", "-r", tag, "sourcedata").splitlines() if line.startswith("120000 ")]
+validated = git("show", f"{tag}:code/assets.tsv").splitlines()[1:]
+assert len(links) == len(validated) + 1, (len(links), len(validated))
 
 capsule = pathlib.Path.cwd() / name
 provenance = read_provenance(capsule)
 assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] == digest, provenance
-assert provenance["sourcedata"]["commit"] == sourcedata[2], provenance["sourcedata"]
+# The git-annex branch records where the manifest's version downloads from.
+manifest_url = provenance["sourcedata"]["manifest_url"]
+assert "?versionId=" in manifest_url, manifest_url
+assert git("grep", "--fixed-strings", "--files-with-matches", manifest_url, "git-annex"), manifest_url
 row = capsule_row(capsule)
 assert row["status"] == "successful", row
 assert row["files_streamed"] == row["assets"], (row["files_streamed"], row["assets"])

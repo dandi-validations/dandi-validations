@@ -5,6 +5,7 @@ The example is Dandiset 000006 (see tests/README.md). What the repository holds 
 test_expected_output.py's.
 """
 
+import dataclasses
 import hashlib
 import json
 import logging
@@ -16,6 +17,7 @@ import pytest
 
 from dandi_validations import (
     Capsule,
+    ManifestFile,
     capsule_branches,
     capsule_status,
     checkout_capsule,
@@ -35,7 +37,7 @@ from .test_expected_output import EXAMPLE_DANDISET_ID, EXAMPLE_MANIFEST_DIRECTOR
 REPOSITORY_URL = f"https://github.com/dandi-validations/{EXAMPLE_DANDISET_ID}"
 
 
-def _claim(runner: pathlib.Path, /, manifest_directory: pathlib.Path = EXAMPLE_MANIFEST_DIRECTORY) -> int:
+def _claim(runner: pathlib.Path, /, manifest_directory: pathlib.Path | None = EXAMPLE_MANIFEST_DIRECTORY) -> int:
     return run_job(
         path=runner,
         dandiset_id=EXAMPLE_DANDISET_ID,
@@ -94,6 +96,19 @@ def _record(runner: pathlib.Path, /) -> None:
     )
 
 
+def _annexed(*, root: pathlib.Path, directory: str) -> dict[str, tuple[str, list[str]]]:
+    """Map each annexed file of a directory, by its path in the directory, to its key and the URLs recorded for it."""
+    prefix = "" if directory == "." else f"{directory}/"
+    records = [json.loads(line) for line in git("annex", "whereis", "--json", "--", directory, cwd=root).splitlines()]
+    return {
+        record["file"].removeprefix(prefix): (
+            record["key"],
+            sorted(url for location in record["whereis"] for url in location.get("urls", [])),
+        )
+        for record in records
+    }
+
+
 def _changed_manifest(tmp_path: pathlib.Path, /) -> pathlib.Path:
     changed_manifest = tmp_path / "changed-manifest"
     shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
@@ -114,9 +129,18 @@ def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path: pathlib.Path, monk
     assert dot_git.is_file() or dot_git.is_symlink()
     assert str(capsule.path) in git("worktree", "list", cwd=world.runner)
     assert git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
-    # sourcedata/ is linked, never fetched, and the git-annex branch is not pushed while it records nothing.
-    assert list((capsule.path / "sourcedata").iterdir()) == []
-    assert set(remote_heads(root=world.runner, remote="origin")) == {"main", capsule.tag}
+    # sourcedata/ holds the manifest and the files it lists, none of which is downloaded. The
+    # git-annex branch records where each file is, and nothing about the runner.
+    assert (capsule.sourcedata_directory / "dandiset.yaml").read_bytes() == (
+        EXAMPLE_MANIFEST_DIRECTORY / "dandiset.yaml"
+    ).read_bytes()
+    assert capsule.manifest_path.read_bytes() == (EXAMPLE_MANIFEST_DIRECTORY / "assets.jsonld").read_bytes()
+    asset = capsule.sourcedata_directory / "sub-anm369962" / "sub-anm369962_ses-20170309.nwb"
+    assert asset.is_symlink()
+    assert not asset.exists()
+    assert set(remote_heads(root=world.runner, remote="origin")) == {"main", capsule.tag, "git-annex"}
+    runner_uuid = git("config", "--get", "annex.uuid", cwd=world.runner).strip()
+    assert runner_uuid not in git("log", "--patch", "git-annex", cwd=world.repository)
 
 
 @pytest.mark.ai_generated
@@ -131,11 +155,115 @@ def test_another_runner_gets_the_capsule_back(tmp_path: pathlib.Path, monkeypatc
     assert capsule_status(other_capsule.path) == "stalled"
     assert read_provenance(other_capsule.path) == read_provenance(capsule.path)
 
-    # git itself can clone the capsules and their sourcedata/ from main's submodules.
+    # git itself can clone the capsules, with their sourcedata/, from main's submodules.
     recursive = tmp_path / "recursive"
     subprocess.run(["git", "clone", "--quiet", "--recurse-submodules", REPOSITORY_URL, str(recursive)], check=True)
     assert (recursive / capsule.name / "code" / "submit.sh").exists()
     assert (recursive / capsule.name / "sourcedata" / "dandiset.yaml").exists()
+
+
+@pytest.mark.ai_generated
+@pytest.mark.datalad
+def test_sourcedata_is_the_dataset_that_run_sh_validates(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    _claim(world.runner)
+    capsule = _capsule(world.runner)
+
+    # As run.sh builds it inside the image, from the capsule's inputs.
+    built = tmp_path / "built"
+    for command in (
+        ["datalad", "create", "-c", "text2git", str(built)],
+        ["cp", str(capsule.sourcedata_directory / "dandiset.yaml"), str(built / "dandiset.yaml")],
+        ["datalad", "save", "-d", str(built), "-m", "Add dandiset.yaml", str(built / "dandiset.yaml")],
+        [
+            "datalad",
+            "addurls",
+            "-d",
+            str(built),
+            "--input-type",
+            "tsv",
+            "--exclude-autometa",
+            ".*",
+            "--key",
+            "et:SHA256-s{size}--{sha256}",
+            str(capsule.code_directory / "assets.tsv"),
+            "{url}",
+            "{path}",
+        ],
+    ):
+        subprocess.run(command, cwd=tmp_path, capture_output=True, check=True)
+
+    sourcedata = _annexed(root=capsule.path, directory="sourcedata")
+    manifest_key, manifest_urls = sourcedata.pop(".dandi/assets.jsonld")
+    assert sourcedata == _annexed(root=built, directory=".")
+    assert len(sourcedata) == 53
+    assert (built / "dandiset.yaml").read_bytes() == (capsule.sourcedata_directory / "dandiset.yaml").read_bytes()
+    # The example's manifest is a frozen copy, which no URL serves.
+    assert manifest_key.startswith("SHA256E-s")
+    assert manifest_urls == []
+
+
+@pytest.mark.ai_generated
+def test_capsules_share_what_git_annex_records(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    _claim(world.runner)
+    first = _capsule(world.runner)
+    recorded = git("rev-parse", "git-annex", cwd=world.runner)
+
+    # Another image's capsule, in another worktree of the same clone, registers the same files.
+    newer = dataclasses.replace(load_pipeline(), container_version="d0.83.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2")
+    monkeypatch.setattr("dandi_validations._capsule.load_pipeline", lambda: newer)
+    assert _claim(world.runner) == 0
+    second = Capsule(
+        repository_root=world.runner,
+        dandiset_id=EXAMPLE_DANDISET_ID,
+        pipeline=newer.pipeline,
+        tag=newer.tag,
+    )
+
+    assert second.path != first.path
+    assert _annexed(root=second.path, directory="sourcedata") == _annexed(root=first.path, directory="sourcedata")
+    assert git("rev-parse", "git-annex", cwd=world.runner) == recorded
+    assert set(remote_heads(root=world.runner, remote="origin")) == {"main", first.tag, second.tag, "git-annex"}
+
+
+@pytest.mark.ai_generated
+def test_a_fresh_clone_gets_the_manifest_from_the_version_downloaded(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    # Stand in for the archive's S3 bucket, which serves each version that was downloaded.
+    bucket = tmp_path / "bucket"
+    bucket.mkdir()
+    downloads = {}
+    for name in ("assets.jsonld", "dandiset.yaml"):
+        shutil.copyfile(EXAMPLE_MANIFEST_DIRECTORY / name, bucket / name)
+        downloads[name] = ManifestFile(content=(bucket / name).read_bytes(), url=(bucket / name).as_uri())
+    monkeypatch.setattr("dandi_validations._capsule.fetch_assets_jsonld", lambda **_: downloads["assets.jsonld"])
+    monkeypatch.setattr("dandi_validations._capsule.fetch_dandiset_yaml", lambda **_: downloads["dandiset.yaml"])
+
+    assert _claim(world.runner, manifest_directory=None) == 0
+    capsule = _capsule(world.runner)
+    sourcedata = read_provenance(capsule.path)["sourcedata"]
+    assert sourcedata["manifest_url"] == downloads["assets.jsonld"].url
+    assert sourcedata["dandiset_yaml_url"] == downloads["dandiset.yaml"].url
+
+    # git-annex downloads file:// URLs, which stand in for S3 here, only once allowed.
+    git("config", "--global", "annex.security.allowed-url-schemes", "http https ftp file", cwd=tmp_path)
+    fresh = tmp_path / "fresh"
+    git("clone", "--quiet", "--branch", capsule.tag, REPOSITORY_URL, str(fresh), cwd=tmp_path)
+    git("annex", "init", "--quiet", "a reader", cwd=fresh)
+    git("annex", "get", "--quiet", sourcedata["manifest"], cwd=fresh)
+    assert (fresh / sourcedata["manifest"]).read_bytes() == downloads["assets.jsonld"].content
+    # Every file the manifest lists can be downloaded from S3 too.
+    asset = "sourcedata/sub-anm369962/sub-anm369962_ses-20170309.nwb"
+    assert _annexed(root=fresh, directory=asset)[asset][1] == [
+        "https://dandiarchive.s3.amazonaws.com/blobs/063/b97/063b9771-b0c0-4b84-8b7d-fb52929b3087",
+    ]
 
 
 @pytest.mark.ai_generated
@@ -240,7 +368,7 @@ def test_an_image_not_known_to_be_the_published_one_is_not_pointed_at_it(
 
     assert not register_image_url(capsule=capsule, container_name=load_pipeline().container_name, url=url)
     _record(world.runner)
-    assert "git-annex" not in remote_heads(root=world.runner, remote="origin")
+    assert url not in git("log", "--patch", "git-annex", cwd=world.repository)
 
 
 @pytest.mark.ai_generated

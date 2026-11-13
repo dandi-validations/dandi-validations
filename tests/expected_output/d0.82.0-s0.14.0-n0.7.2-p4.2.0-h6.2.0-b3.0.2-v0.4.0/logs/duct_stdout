@@ -1,0 +1,98 @@
+=== dandi-validation image ===
+{
+  "validator_versions": {
+    "dandi": "0.82.0+28.gbec91fa4",
+    "dandischema": "0.14.0",
+    "nwbinspector": "0.7.2",
+    "pynwb": "4.2.0",
+    "hdmf": "6.2.0",
+    "bids-validator-deno": "3.0.2"
+  },
+  "tool_versions": {
+    "datalad": "1.8.0",
+    "datalad-container": "1.2.6",
+    "datalad-fuse": "0.7.0+14.ge480cd8",
+    "remfile": "0.1.15",
+    "con-duct": "0.23.0",
+    "bidsschematools": "1.2.7"
+  },
+  "git": "git version 2.56.0",
+  "git_annex": "10.20260717-g0c917920c80ab1e8cc3d8f5886537708949e1659"<capsule>/intermediate/000006 (dataset) [/opt/dandi-validation/.pixi/envs/default...]
+create(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006 (dataset)
+action summary:
+  create (ok: 1)
+  run (ok: 1)
+add(ok): dandiset.yaml (file)
+save(ok): . (dataset)
+action summary:
+  add (ok: 1)
+  save (ok: 1)
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170309.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170310.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170313.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170314.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170316.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170317.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170227.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170228.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170301.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170302.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170306.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170309.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170310.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369964/sub-anm369964_ses-20170320.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369964/sub-anm369964_ses-20170321.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369964/sub-anm369964_ses-20170322.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369964/sub-anm369964_ses-20170323.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372793/sub-anm372793_ses-20170504.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372793/sub-anm372793_ses-20170508.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372793/sub-anm372793_ses-20170512.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372793/sub-anm372793_ses-20170513.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372793/sub-anm372793_ses-20170514.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170621.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170622.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170624.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170625.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170626.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372794/sub-anm372794_ses-20170627.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372795/sub-anm372795_ses-20170714.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372795/sub-anm372795_ses-20170715.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372795/sub-anm372795_ses-20170716.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372795/sub-anm372795_ses-20170718.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372797/sub-anm372797_ses-20170615.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372797/sub-anm372797_ses-20170617.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372904/sub-anm372904_ses-20170615.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372904/sub-anm372904_ses-20170616.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372904/sub-anm372904_ses-20170617.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372904/sub-anm372904_ses-20170618.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372904/sub-anm372904_ses-20170619.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372905/sub-anm372905_ses-20170715.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372905/sub-anm372905_ses-20170716.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372905/sub-anm372905_ses-20170717.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372906/sub-anm372906_ses-20170608.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372906/sub-anm372906_ses-20170610.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372906/sub-anm372906_ses-20170611.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372906/sub-anm372906_ses-20170612.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372907/sub-anm372907_ses-20170608.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372907/sub-anm372907_ses-20170610.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372907/sub-anm372907_ses-20170612.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372907/sub-anm372907_ses-20170613.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372909/sub-anm372909_ses-20170520.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm372909/sub-anm372909_ses-20170522.nwb (file) [registered URL]
+save(ok): . (dataset)
+action summary:
+  fromkey (ok: 53)
+  save (ok: 1)
+Registered 53 annexed files (none downloaded).
+=== Validating Dandiset 000006 (--missing-file-content=stream, -J 8) ===
+dandi validate exited with 1
+=== Writing results ===
+run(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0 (dataset) [apptainer exec --cleanenv envs/dandi-val...]
+add(ok): derivatives/validation.jsonl (file)
+save(ok): . (dataset)
+action summary:
+  add (ok: 1)
+  get (notneeded: 5)
+  run (ok: 1)
+  save (ok: 1)

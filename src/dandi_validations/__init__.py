@@ -26,7 +26,14 @@ from ._capsule import (
 )
 from ._capsule_table import CAPSULE_TABLE_COLUMNS, capsule_row, read_capsule_table
 from ._collect import collect, write_records
-from ._manifest import assets_table_bytes, fetch_assets_jsonld, parse_assets_jsonld, select_assets, source_digest
+from ._manifest import (
+    ManifestFile,
+    assets_table_bytes,
+    fetch_assets_jsonld,
+    parse_assets_jsonld,
+    select_assets,
+    source_digest,
+)
 from ._pipeline import CAPSULE_CODE_DIRECTORY, PIPELINE_FILE_PATH, TEMPLATES_DIRECTORY, Pipeline, load_pipeline
 from ._registry import DIGEST_OVERRIDE_VARIABLE, resolve_digest
 from ._repositories import (
@@ -57,6 +64,7 @@ __all__ = [
     "VALIDATOR_CODES",
     "Capsule",
     "GitHub",
+    "ManifestFile",
     "Pipeline",
     "PrepareResult",
     "VersionCodeError",

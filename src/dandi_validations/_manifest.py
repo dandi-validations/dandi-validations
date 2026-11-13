@@ -4,12 +4,14 @@ Turn the DANDI Archive's per-Dandiset S3 manifests into what ``datalad addurls``
 This is the strategy at the top of dandi/dandi-cli#1956. The DataLad dataset that is validated is
 built from ``assets.jsonld``, so each file gets its SHA-256 git-annex key and its S3 URL without
 anything being downloaded. The rows are written to a capsule's ``code/assets.tsv``, so the run
-records exactly which content it validated.
+records exactly which content it validated. The manifest itself is kept in the capsule's
+``sourcedata/``, with the URL of the S3 version it was downloaded from.
 """
 
 import dataclasses
 import hashlib
 import json
+import urllib.parse
 
 import requests
 
@@ -24,6 +26,25 @@ _ZARR_SUFFIXES = (".zarr", ".ngff", ".ome.zarr")
 
 class ManifestNotFoundError(LookupError):
     """Signal that the archive has no manifest for a Dandiset version (e.g., embargoed or empty)."""
+
+
+@dataclasses.dataclass(frozen=True)
+class ManifestFile:
+    """
+    Hold a file of a Dandiset's manifest (``assets.jsonld`` or ``dandiset.yaml``).
+
+    Attributes
+    ----------
+    content : bytes
+        The file, as downloaded.
+    url : str or None
+        A URL that serves exactly this content: that of the S3 object version it was downloaded
+        from. It is ``None`` for a copy that was not downloaded from S3 (e.g., a frozen copy).
+
+    """
+
+    content: bytes
+    url: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -74,16 +95,20 @@ class SkippedAsset:
     reason: str
 
 
-def _fetch(*, url: str, timeout: float = 120.0) -> bytes:
+def _fetch(*, url: str, timeout: float = 120.0) -> ManifestFile:
     response = requests.get(url, headers={"User-Agent": "dandi-validations"}, timeout=timeout)
     if response.status_code in (403, 404):
         message = f"{url} is not available (HTTP {response.status_code})."
         raise ManifestNotFoundError(message)
     response.raise_for_status()
-    return response.content
+    # The draft's manifest is overwritten as the Dandiset changes, but the bucket keeps every
+    # version of it, so the version this response holds stays downloadable.
+    version_id = response.headers.get("x-amz-version-id")
+    version_url = f"{url}?{urllib.parse.urlencode({'versionId': version_id})}" if version_id else None
+    return ManifestFile(content=response.content, url=version_url)
 
 
-def fetch_assets_jsonld(*, dandiset_id: str, version: str = "draft") -> bytes:
+def fetch_assets_jsonld(*, dandiset_id: str, version: str = "draft") -> ManifestFile:
     """
     Download the ``assets.jsonld`` manifest of a Dandiset version.
 
@@ -96,14 +121,14 @@ def fetch_assets_jsonld(*, dandiset_id: str, version: str = "draft") -> bytes:
 
     Returns
     -------
-    bytes
-        The manifest.
+    ManifestFile
+        The manifest, with the URL of the S3 version it was downloaded from.
 
     """
     return _fetch(url=ASSETS_JSONLD_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version))
 
 
-def fetch_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> bytes:
+def fetch_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> ManifestFile:
     """
     Download the ``dandiset.yaml`` metadata of a Dandiset version.
 
@@ -116,8 +141,8 @@ def fetch_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> bytes:
 
     Returns
     -------
-    bytes
-        The metadata.
+    ManifestFile
+        The metadata, with the URL of the S3 version it was downloaded from.
 
     """
     return _fetch(url=DANDISET_YAML_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version))
