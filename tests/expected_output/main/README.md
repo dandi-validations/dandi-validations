@@ -28,8 +28,8 @@ https://github.com/dandi-validations/000006/   (main)
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
     ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of https://github.com/dandi-validations/dandi-validations)
     └── sourcedata/  ← the run's input, the manifest (assets.jsonld) as downloaded from S3, and in
-                       000006/ the dataset the run mints from it and validates, around
-                       its dandiset.yaml as downloaded
+                       000006/ its output: the dataset the run mints from it and
+                       validates, with the Dandiset's dandiset.yaml
 ```
 
 A capsule holds the latest validation of the Dandiset with its image and version of DANDI Validations.

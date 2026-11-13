@@ -134,7 +134,8 @@ def run_job(  # noqa: PLR0913
     manifest_directory : pathlib.Path or None, default=None
         A directory holding the Dandiset's ``assets.jsonld`` and ``dandiset.yaml`` to use instead
         of the archive's current ones on S3 (e.g., a frozen copy, to rerun a capsule or test).
-        No URL is known for a copy, so its manifest's content stays in this clone.
+        No URL is known for a copy, so its manifest's content stays in this clone. The run downloads
+        its ``dandiset.yaml`` by its ``file://`` URL, so the image must see the directory.
     execute : bool, default=True
         Whether to run the capsule, rather than only form and claim it.
     now : datetime.datetime or None, default=None
@@ -157,17 +158,17 @@ def run_job(  # noqa: PLR0913
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
     ensure_annex(root=root, remote=push_to)
 
-    assets_jsonld = dandiset_yaml = None
+    assets_jsonld = dandiset_yaml_url = None
     if manifest_directory is not None:
         assets_jsonld = (manifest_directory / "assets.jsonld").read_bytes()
-        dandiset_yaml = (manifest_directory / "dandiset.yaml").read_bytes()
+        dandiset_yaml_url = (manifest_directory / "dandiset.yaml").resolve().as_uri()
     plan = plan_capsule(
         repository_root=root,
         dandiset_id=dandiset_id,
         dandiset_version=dandiset_version,
         params_key=params_key,
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
     )
     if isinstance(plan, str):
         _log.info("%s", plan)

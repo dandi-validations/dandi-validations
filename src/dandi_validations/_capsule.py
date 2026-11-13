@@ -13,8 +13,8 @@ Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its
         ├── derivatives/  ← the validation results (only for a completed run)
         ├── envs/  ← the image's registration
         └── sourcedata/  ← the Dandiset's manifest, as downloaded from S3 (the run's input), and in
-                           {dandiset_id}/ the dataset the run mints from it and validates (its
-                           output), around the Dandiset's dandiset.yaml, as downloaded (an input)
+                           {dandiset_id}/ the dataset the run mints from it and validates, with the
+                           dandiset.yaml it downloads (its output)
 
 ``{tag}`` is the dandi-validation image's tag (its validator version code), followed by ``-v`` and
 the version of dandi-validations that formed the capsule. Each capsule is a DataLad dataset on the
@@ -38,7 +38,7 @@ import socket
 import subprocess
 
 from ._globals import CODEBASE_URL, DANDI_ARCHIVE_URL, DEFAULT_PARAMS_KEY, ORGANIZATION, PROVENANCE_KEY
-from ._manifest import ManifestFile, fetch_assets_jsonld, fetch_dandiset_yaml, parse_assets_jsonld, source_digest
+from ._manifest import ManifestFile, fetch_assets_jsonld, locate_dandiset_yaml, parse_assets_jsonld, source_digest
 from ._pipeline import (
     CAPSULE_CODE_DIRECTORY,
     TEMPLATES_DIRECTORY,
@@ -436,8 +436,8 @@ class CapsulePlan:
         The inputs that identify the run.
     assets_jsonld : ManifestFile
         The Dandiset's manifest.
-    dandiset_yaml : ManifestFile
-        The Dandiset's metadata.
+    dandiset_yaml_url : str
+        Where the run downloads the Dandiset's ``dandiset.yaml`` from.
     number_of_assets : int
         How many assets the manifest lists, each of which the run registers.
 
@@ -448,7 +448,7 @@ class CapsulePlan:
     parameters: ParameterSet
     inputs: dict
     assets_jsonld: ManifestFile
-    dandiset_yaml: ManifestFile
+    dandiset_yaml_url: str
     number_of_assets: int
 
 
@@ -478,13 +478,13 @@ def plan_capsule(  # noqa: PLR0913
     params_key: str = DEFAULT_PARAMS_KEY,
     pipeline: Pipeline | None = None,
     assets_jsonld: bytes | None = None,
-    dandiset_yaml: bytes | None = None,
+    dandiset_yaml_url: str | None = None,
 ) -> CapsulePlan | str:
     """
     Read a Dandiset's manifest and work out the capsule of the pinned image and this code's version.
 
     The inputs that identify a run are the Dandiset version, the image's version code, the
-    parameter set, and the digest of the Dandiset's files (each asset's path, size and SHA-256) and metadata.
+    parameter set, and the digest of the Dandiset's files (each asset's path, size and SHA-256).
 
     Parameters
     ----------
@@ -500,8 +500,8 @@ def plan_capsule(  # noqa: PLR0913
         The pipeline, if not the pinned one.
     assets_jsonld : bytes or None, default=None
         The manifest, if not the archive's current one.
-    dandiset_yaml : bytes or None, default=None
-        The metadata, if not the archive's current one.
+    dandiset_yaml_url : str or None, default=None
+        Where the run downloads ``dandiset.yaml`` from, if not the archive's current one.
 
     Returns
     -------
@@ -516,11 +516,8 @@ def plan_capsule(  # noqa: PLR0913
         if assets_jsonld is None
         else ManifestFile(content=assets_jsonld)
     )
-    metadata = (
-        fetch_dandiset_yaml(dandiset_id=dandiset_id, version=dandiset_version)
-        if dandiset_yaml is None
-        else ManifestFile(content=dandiset_yaml)
-    )
+    if dandiset_yaml_url is None:
+        dandiset_yaml_url = locate_dandiset_yaml(dandiset_id=dandiset_id, version=dandiset_version)
 
     assets = parse_assets_jsonld(manifest.content)
     if not assets:
@@ -530,7 +527,7 @@ def plan_capsule(  # noqa: PLR0913
         "dandiset_version": dandiset_version,
         "version": pipeline.container_version,
         "params": parameters.identifier,
-        "source_digest": source_digest(assets=assets, dandiset_yaml=metadata.content),
+        "source_digest": source_digest(assets=assets),
     }
     capsule = Capsule(
         repository_root=repository_root,
@@ -544,7 +541,7 @@ def plan_capsule(  # noqa: PLR0913
         parameters=parameters,
         inputs=inputs,
         assets_jsonld=manifest,
-        dandiset_yaml=metadata,
+        dandiset_yaml_url=dandiset_yaml_url,
         number_of_assets=len(assets),
     )
 
@@ -575,10 +572,9 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
     Replace a capsule's code, source data and results with the next run's, and record its provenance.
 
     Only what a run writes is replaced. The capsule's dataset, image registration and history stay.
-    The Dandiset's manifest and metadata are written as they were downloaded, as the run's inputs:
-    the manifest to ``sourcedata/``, and ``dandiset.yaml`` to ``sourcedata/{dandiset_id}/``, where
-    the run mints the rest of the dataset it validates. Annexing the manifest needs git-annex (see
-    ``annex_manifest``).
+    The Dandiset's manifest, the run's input, is written to ``sourcedata/`` as it was downloaded.
+    Annexing it needs git-annex (see ``annex_manifest``). The run mints the dataset it validates
+    from it in ``sourcedata/{dandiset_id}/``, and downloads the Dandiset's ``dandiset.yaml`` there.
 
     Parameters
     ----------
@@ -600,13 +596,18 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
             shutil.rmtree(target)
 
     image_digest = resolve_digest(image=pipeline.container_image, tag=pipeline.container_version)
-    sourcedata = _write_sourcedata(capsule=capsule, assets_jsonld=plan.assets_jsonld, dandiset_yaml=plan.dandiset_yaml)
+    sourcedata = _write_sourcedata(
+        capsule=capsule,
+        assets_jsonld=plan.assets_jsonld,
+        dandiset_yaml_url=plan.dandiset_yaml_url,
+    )
     _write_code(
         capsule=capsule,
         pipeline=pipeline,
         image_digest=image_digest,
         parameters=plan.parameters,
         dandiset_version=plan.inputs["dandiset_version"],
+        dandiset_yaml_url=plan.dandiset_yaml_url,
         now=now,
     )
     codebase_version = _codebase_version(pipeline.codebase_version)
@@ -645,7 +646,7 @@ def prepare_capsule(  # noqa: PLR0913
     now: datetime.datetime | None = None,
     pipeline: Pipeline | None = None,
     assets_jsonld: bytes | None = None,
-    dandiset_yaml: bytes | None = None,
+    dandiset_yaml_url: str | None = None,
 ) -> PrepareResult:
     """
     Plan a capsule and write it, unless it already validated these inputs.
@@ -670,8 +671,8 @@ def prepare_capsule(  # noqa: PLR0913
         The pipeline, if not the pinned one.
     assets_jsonld : bytes or None, default=None
         The manifest, if not the archive's current one.
-    dandiset_yaml : bytes or None, default=None
-        The metadata, if not the archive's current one.
+    dandiset_yaml_url : str or None, default=None
+        Where the run downloads ``dandiset.yaml`` from, if not the archive's current one.
 
     Returns
     -------
@@ -686,7 +687,7 @@ def prepare_capsule(  # noqa: PLR0913
         params_key=params_key,
         pipeline=pipeline,
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
     )
     if isinstance(plan, str):
         return PrepareResult(capsule=None, reason=plan)
@@ -697,16 +698,15 @@ def prepare_capsule(  # noqa: PLR0913
     return PrepareResult(capsule=plan.capsule, reason=f"Formed {plan.capsule.name} for {plan.number_of_assets} assets.")
 
 
-def _write_sourcedata(*, capsule: Capsule, assets_jsonld: ManifestFile, dandiset_yaml: ManifestFile) -> dict:
-    capsule.dandiset_yaml_path.parent.mkdir(parents=True)
+def _write_sourcedata(*, capsule: Capsule, assets_jsonld: ManifestFile, dandiset_yaml_url: str) -> dict:
+    capsule.manifest_path.parent.mkdir(parents=True)
     capsule.manifest_path.write_bytes(assets_jsonld.content)
-    capsule.dandiset_yaml_path.write_bytes(dandiset_yaml.content)
     return {
         "path": SOURCEDATA,
         "manifest": capsule.manifest_path.relative_to(capsule.path).as_posix(),
         "manifest_url": assets_jsonld.url,
         "dandiset_yaml": capsule.dandiset_yaml_path.relative_to(capsule.path).as_posix(),
-        "dandiset_yaml_url": dandiset_yaml.url,
+        "dandiset_yaml_url": dandiset_yaml_url,
         "dataset": capsule.source_dataset_directory.relative_to(capsule.path).as_posix(),
     }
 
@@ -718,6 +718,7 @@ def _write_code(  # noqa: PLR0913
     image_digest: str | None,
     parameters: ParameterSet,
     dandiset_version: str,
+    dandiset_yaml_url: str,
     now: datetime.datetime,
 ) -> None:
     code_directory = capsule.code_directory
@@ -742,6 +743,7 @@ def _write_code(  # noqa: PLR0913
         sif_url=pipeline.sif_url,
         sif_release_url=pipeline.sif_release_url,
         params_file_name=params_file_path.name,
+        dandiset_yaml_url=dandiset_yaml_url,
     )
     capsule.submit_script_path.write_text(submit_script)
     for name in ("submit.sh", "run.sh"):

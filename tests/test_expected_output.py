@@ -66,8 +66,6 @@ REGENERATE = os.environ.get("DANDI_VALIDATIONS_REGENERATE_EXPECTED_OUTPUT") == "
 # What the run writes into a claimed capsule, and what it changes there: `datalad containers-add`
 # registers the image in the capsule's DataLad configuration.
 RUN_OUTPUTS = ("logs/", "derivatives/", "envs/", f"sourcedata/{EXAMPLE_DANDISET_ID}/")
-# The claim writes the dataset's dandiset.yaml, an input, and the run mints the rest around it.
-CLAIMED_INPUTS = (f"sourcedata/{EXAMPLE_DANDISET_ID}/dandiset.yaml",)
 CHANGED_BY_RUN = (".datalad/config",)
 # These logs hold progress output and samples taken while the run goes. Their expected copies show
 # one run, and only their presence is checked.
@@ -99,7 +97,7 @@ _DATASET_ID_RE = re.compile(
     re.MULTILINE,
 )
 # Where the run's files are, in the results and logs, which a version bump would otherwise rename.
-_CAPSULE_PATH_RE = re.compile(rf'"[^"]*?/(intermediate/|sourcedata/(?={EXAMPLE_DANDISET_ID}[/"]))')
+_CAPSULE_PATH_RE = re.compile(rf'"[^"\s]*?/(intermediate/|sourcedata/(?={EXAMPLE_DANDISET_ID}[/"]))')
 _ANNEX_OBJECT_RE = re.compile(r"\.git/annex/objects/\S+")
 # Only the image's key depends on how it was built. The Dandiset's files and manifest have theirs
 # from the frozen example, so sourcedata/ shows them as they are.
@@ -141,6 +139,11 @@ class World:
         """Locate the example's repository, https://github.com/dandi-validations/000006."""
         return self.github / "dandi-validations" / EXAMPLE_DANDISET_ID
 
+    @property
+    def manifest_directory(self) -> pathlib.Path:
+        """Locate the copy of the example's manifest, where the image can read its dandiset.yaml."""
+        return self.github.parent / "example"
+
 
 def make_world(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> World:
     """
@@ -168,6 +171,7 @@ def make_world(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> Wo
         monkeypatch.setenv(variable, value)
 
     world = World(github=github, runner=tmp_path / "runner")
+    shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, world.manifest_directory)
     world.repository.parent.mkdir(parents=True)
     git("init", "--quiet", "--bare", "-b", "main", str(world.repository), cwd=tmp_path)
     sync_work = tmp_path / "sync"
@@ -333,11 +337,7 @@ def assert_matches_expected(*, actual: pathlib.Path, expected: pathlib.Path, cla
     actual_files = {path.relative_to(actual) for path in actual.rglob("*") if path.is_file()}
     expected_files = {path.relative_to(expected) for path in expected.rglob("*") if path.is_file()}
     if claimed:
-        expected_files = {
-            path
-            for path in expected_files
-            if not _branch_path(path).startswith(RUN_OUTPUTS) or _branch_path(path) in CLAIMED_INPUTS
-        }
+        expected_files = {path for path in expected_files if not _branch_path(path).startswith(RUN_OUTPUTS)}
     assert actual_files == expected_files, (
         f"File trees differ.\nMissing: {sorted(map(str, expected_files - actual_files))}\n"
         f"Unexpected: {sorted(map(str, actual_files - expected_files))}"
@@ -366,7 +366,7 @@ def test_claimed_capsule_matches_expected_output(tmp_path: pathlib.Path, monkeyp
         path=world.runner,
         dandiset_id=EXAMPLE_DANDISET_ID,
         push_to="origin",
-        manifest_directory=EXAMPLE_MANIFEST_DIRECTORY,
+        manifest_directory=world.manifest_directory,
         execute=False,
         now=NOW,
     )
@@ -398,7 +398,7 @@ def test_validated_capsule_matches_expected_output(
             dandiset_id=EXAMPLE_DANDISET_ID,
             push_to="origin",
             time_limit_minutes=60,
-            manifest_directory=EXAMPLE_MANIFEST_DIRECTORY,
+            manifest_directory=world.manifest_directory,
             now=NOW,
         )
 

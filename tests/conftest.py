@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-DANDISET_YAML = b"identifier: DANDI:000123\nname: A test Dandiset\n"
+DANDISET_YAML_URL = "https://dandiarchive.s3.amazonaws.com/dandisets/000123/draft/dandiset.yaml?versionId=v1"
 
 
 def make_asset(
@@ -61,9 +61,9 @@ def assets_jsonld() -> bytes:
 
 
 @pytest.fixture
-def dandiset_yaml() -> bytes:
-    """Describe the Dandiset."""
-    return DANDISET_YAML
+def dandiset_yaml_url() -> str:
+    """Locate the Dandiset's dandiset.yaml, which the run downloads."""
+    return DANDISET_YAML_URL
 
 
 @pytest.fixture

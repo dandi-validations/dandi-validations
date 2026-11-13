@@ -24,7 +24,7 @@ class ManifestNotFoundError(LookupError):
 @dataclasses.dataclass(frozen=True)
 class ManifestFile:
     """
-    Hold a file of a Dandiset's manifest (``assets.jsonld`` or ``dandiset.yaml``).
+    Hold a Dandiset's ``assets.jsonld`` manifest.
 
     Attributes
     ----------
@@ -40,17 +40,20 @@ class ManifestFile:
     url: str | None = None
 
 
-def _fetch(*, url: str, timeout: float = 120.0) -> ManifestFile:
-    response = requests.get(url, headers={"User-Agent": "dandi-validations"}, timeout=timeout)
+def _request(*, method: str, url: str, timeout: float = 120.0) -> requests.Response:
+    response = requests.request(method, url, headers={"User-Agent": "dandi-validations"}, timeout=timeout)
     if response.status_code in (403, 404):
         message = f"{url} is not available (HTTP {response.status_code})."
         raise ManifestNotFoundError(message)
     response.raise_for_status()
-    # The draft's manifest is overwritten as the Dandiset changes, but the bucket keeps every
-    # version of it, so the version this response holds stays downloadable.
+    return response
+
+
+def _version_url(*, url: str, response: requests.Response) -> str | None:
+    # The draft's files are overwritten as the Dandiset changes, but the bucket keeps every
+    # version of them, so the version a response names stays downloadable.
     version_id = response.headers.get("x-amz-version-id")
-    version_url = f"{url}?{urllib.parse.urlencode({'versionId': version_id})}" if version_id else None
-    return ManifestFile(content=response.content, url=version_url)
+    return f"{url}?{urllib.parse.urlencode({'versionId': version_id})}" if version_id else None
 
 
 def fetch_assets_jsonld(*, dandiset_id: str, version: str = "draft") -> ManifestFile:
@@ -70,12 +73,16 @@ def fetch_assets_jsonld(*, dandiset_id: str, version: str = "draft") -> Manifest
         The manifest, with the URL of the S3 version it was downloaded from.
 
     """
-    return _fetch(url=ASSETS_JSONLD_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version))
+    url = ASSETS_JSONLD_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version)
+    response = _request(method="GET", url=url)
+    return ManifestFile(content=response.content, url=_version_url(url=url, response=response))
 
 
-def fetch_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> ManifestFile:
+def locate_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> str:
     """
-    Download the ``dandiset.yaml`` metadata of a Dandiset version.
+    Locate the ``dandiset.yaml`` of a Dandiset version on S3, without downloading it.
+
+    The run downloads it, since ``dandi validate`` finds the Dandiset's root by it.
 
     Parameters
     ----------
@@ -86,11 +93,13 @@ def fetch_dandiset_yaml(*, dandiset_id: str, version: str = "draft") -> Manifest
 
     Returns
     -------
-    ManifestFile
-        The metadata, with the URL of the S3 version it was downloaded from.
+    str
+        The URL of the S3 version it has now, or its URL when the bucket gives no version.
 
     """
-    return _fetch(url=DANDISET_YAML_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version))
+    url = DANDISET_YAML_URL_TEMPLATE.format(dandiset_id=dandiset_id, version=version)
+    response = _request(method="HEAD", url=url)
+    return _version_url(url=url, response=response) or url
 
 
 def parse_assets_jsonld(content: bytes, /) -> list[dict]:
@@ -120,19 +129,18 @@ def parse_assets_jsonld(content: bytes, /) -> list[dict]:
     return assets
 
 
-def source_digest(*, assets: list[dict], dandiset_yaml: bytes) -> str:
+def source_digest(*, assets: list[dict]) -> str:
     """
-    Digest what the validation reads, which is each asset's path, size and content, and the Dandiset's metadata.
+    Digest what the validation reads, which is each asset's path, size and content.
 
-    An asset's content is named by its SHA-256 digest. Metadata-only changes to assets change
-    ``assets.jsonld`` but none of these, so they do not form a new job.
+    An asset's content is named by its SHA-256 digest. Changes to the metadata of the assets, or
+    of the Dandiset, which ``dandi validate`` does not read, do not change it, so they do not form a
+    new job.
 
     Parameters
     ----------
     assets : list[dict]
         The assets of the manifest.
-    dandiset_yaml : bytes
-        The Dandiset's metadata.
 
     Returns
     -------
@@ -148,6 +156,4 @@ def source_digest(*, assets: list[dict], dandiset_yaml: bytes) -> str:
             asset.get("digest", {}).get("dandi:sha2-256", ""),
         )
         digest.update("\t".join(fields).encode() + b"\n")
-    digest.update(b"\0")
-    digest.update(dandiset_yaml)
     return digest.hexdigest()

@@ -38,7 +38,7 @@
     "dandiset_version": "draft",
     "version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
     "params": "859c878",
-    "source_digest": "76c785d5cc5125e4ee7968a4104c84d3656afcd5c4da47443403f9352c58131f",
+    "source_digest": "a7d134f2922a083ee8bd9eb8f3e44eeb335ef131640808f11a2e880d5337680a",
     "validator_versions": {
       "dandi": "0.82.0",
       "dandischema": "0.14.0",
@@ -55,7 +55,7 @@
       "manifest": "sourcedata/assets.jsonld",
       "manifest_url": null,
       "dandiset_yaml": "sourcedata/000006/dandiset.yaml",
-      "dandiset_yaml_url": null,
+      "dandiset_yaml_url": "file://<tmp>/example/dandiset.yaml",
       "dataset": "sourcedata/000006"
     },
     "pipeline": "dandi+validate",

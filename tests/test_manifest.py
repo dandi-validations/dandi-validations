@@ -1,11 +1,12 @@
 import pytest
 import requests
 
-from dandi_validations import fetch_assets_jsonld, parse_assets_jsonld, source_digest
+from dandi_validations import fetch_assets_jsonld, locate_dandiset_yaml, parse_assets_jsonld, source_digest
 
 from .conftest import make_asset
 
 MANIFEST_URL = "https://dandiarchive.s3.amazonaws.com/dandisets/000123/draft/assets.jsonld"
+DANDISET_YAML_URL = "https://dandiarchive.s3.amazonaws.com/dandisets/000123/draft/dandiset.yaml"
 
 
 class _S3Response:
@@ -48,16 +49,14 @@ def test_parse_assets_jsonld_rejects_anything_but_a_list() -> None:
 )
 def test_source_digest_depends_on_the_files_only(change: dict, changes_digest: bool) -> None:
     asset = make_asset(path="sub-01/sub-01_ses-1.nwb")
-    digest = source_digest(assets=[asset], dandiset_yaml=b"y")
-    assert (source_digest(assets=[{**asset, **change}], dandiset_yaml=b"y") != digest) == changes_digest
+    digest = source_digest(assets=[asset])
+    assert (source_digest(assets=[{**asset, **change}]) != digest) == changes_digest
 
 
 @pytest.mark.ai_generated
-def test_source_digest_depends_on_the_metadata_and_not_the_order() -> None:
+def test_source_digest_does_not_depend_on_the_order() -> None:
     assets = [make_asset(path="sub-01/a.nwb", sha256="a" * 64), make_asset(path="sub-02/b.nwb", sha256="b" * 64)]
-    digest = source_digest(assets=assets, dandiset_yaml=b"y")
-    assert source_digest(assets=assets[::-1], dandiset_yaml=b"y") == digest
-    assert source_digest(assets=assets, dandiset_yaml=b"y2") != digest
+    assert source_digest(assets=assets[::-1]) == source_digest(assets=assets)
 
 
 @pytest.mark.ai_generated
@@ -75,10 +74,33 @@ def test_fetch_records_the_version_downloaded(
     headers: dict[str, str],
     expected_url: str | None,
 ) -> None:
-    monkeypatch.setattr(requests, "get", lambda *_, **__: _S3Response(headers=headers))
+    monkeypatch.setattr(requests, "request", lambda *_, **__: _S3Response(headers=headers))
     manifest = fetch_assets_jsonld(dandiset_id="000123")
     assert manifest.content == b"[]"
     assert manifest.url == expected_url
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    ("headers", "expected_url"),
+    [
+        ({"x-amz-version-id": "Ypet.vU_J"}, f"{DANDISET_YAML_URL}?versionId=Ypet.vU_J"),
+        # Without a version, the run downloads whatever the bucket holds then.
+        ({}, DANDISET_YAML_URL),
+    ],
+    ids=["versioned", "unversioned"],
+)
+def test_locate_dandiset_yaml(monkeypatch: pytest.MonkeyPatch, headers: dict[str, str], expected_url: str) -> None:
+    methods = []
+
+    def respond(method: str, *_: object, **__: object) -> _S3Response:
+        methods.append(method)
+        return _S3Response(headers=headers)
+
+    monkeypatch.setattr(requests, "request", respond)
+    assert locate_dandiset_yaml(dandiset_id="000123") == expected_url
+    # Only the run downloads it.
+    assert methods == ["HEAD"]
 
 
 @pytest.mark.ai_generated

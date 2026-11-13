@@ -31,7 +31,7 @@ def _prepare(  # noqa: PLR0913
     *,
     root: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
     now: datetime.datetime = NOW,
     force: bool = False,
     pipeline: Pipeline | None = None,
@@ -40,7 +40,7 @@ def _prepare(  # noqa: PLR0913
         repository_root=root,
         dandiset_id="000123",
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
         now=now,
         force=force,
         pipeline=pipeline,
@@ -51,14 +51,14 @@ def _formed(
     *,
     root: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
     force: bool = False,
     pipeline: Pipeline | None = None,
 ) -> Capsule:
     capsule = _prepare(
         root=root,
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
         force=force,
         pipeline=pipeline,
     ).capsule
@@ -77,9 +77,9 @@ def _complete(capsule: Capsule, /) -> None:
 def test_capsule_has_its_own_study_dataset_description(
     git_repository: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
 ) -> None:
-    capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
     description = read_dataset_description(capsule.path)
     assert description["DatasetType"] == "study"
     assert read_provenance(capsule.path) == description["DandiValidations"]
@@ -91,32 +91,26 @@ def test_capsule_has_its_own_study_dataset_description(
 def test_capsule_keeps_the_manifest_it_validates_as_sourcedata(
     git_repository: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
 ) -> None:
-    capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    capsule = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
     assert capsule.manifest_path == capsule.path / "sourcedata" / "assets.jsonld"
     assert capsule.manifest_path.read_bytes() == assets_jsonld
-    assert (capsule.sourcedata_directory / "000123" / "dandiset.yaml").read_bytes() == dandiset_yaml
-    # Only the manifest and dandiset.yaml, from which the run mints the dataset, and no table of them.
-    assert sorted(
-        path.relative_to(capsule.sourcedata_directory).as_posix() for path in capsule.sourcedata_directory.rglob("*")
-    ) == [
-        "000123",
-        "000123/dandiset.yaml",
-        "assets.jsonld",
-    ]
+    # Only the manifest, from which the run mints the dataset and downloads its dandiset.yaml.
+    assert list(capsule.sourcedata_directory.iterdir()) == [capsule.manifest_path]
     assert sorted(path.name for path in capsule.code_directory.iterdir() if not path.name.startswith("submitted_")) == [
         "name-default.json",
         "run.sh",
         "submit.sh",
     ]
     # A manifest that was not downloaded from S3 has no URL.
+    assert "' '" + dandiset_yaml_url + "'" in capsule.submit_script_path.read_text()
     assert read_provenance(capsule.path)["sourcedata"] == {
         "path": "sourcedata",
         "manifest": "sourcedata/assets.jsonld",
         "manifest_url": None,
         "dandiset_yaml": "sourcedata/000123/dandiset.yaml",
-        "dandiset_yaml_url": None,
+        "dandiset_yaml_url": dandiset_yaml_url,
         "dataset": "sourcedata/000123",
     }
 
@@ -125,15 +119,15 @@ def test_capsule_keeps_the_manifest_it_validates_as_sourcedata(
 def test_reruns_replace_the_capsule_in_place(
     git_repository: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
 ) -> None:
-    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
 
     # A failed run (logs, no results) is retried in the same capsule.
     first.logs_directory.mkdir()
     (first.logs_directory / "run.json").write_text("{}")
     assert capsule_status(first.path) == "failed"
-    retry = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+    retry = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
     assert retry.path == first.path
     assert not retry.logs_directory.exists()
     assert capsule_status(retry.path) == "stalled"
@@ -144,20 +138,20 @@ def test_reruns_replace_the_capsule_in_place(
     skipped = _prepare(
         root=git_repository,
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
         now=NOW + datetime.timedelta(days=3),
     )
     assert skipped.capsule is None
     assert retry.name in skipped.reason
-    forced = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, force=True)
+    forced = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url, force=True)
     assert forced.path == first.path
     assert not forced.derivatives_directory.exists()
 
     # Changed content is validated again, in the same capsule, and its provenance replaced.
     _complete(forced)
     before = read_provenance(forced.path)["source_digest"]
-    changed_yaml = dandiset_yaml + b"description: changed\n"
-    changed = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=changed_yaml)
+    changed_assets = assets_jsonld.replace(b"b" * 64, b"d" * 64)
+    changed = _formed(root=git_repository, assets_jsonld=changed_assets, dandiset_yaml_url=dandiset_yaml_url)
     assert changed.path == first.path
     assert capsule_status(changed.path) == "stalled"
     assert read_provenance(changed.path)["source_digest"] != before
@@ -168,13 +162,18 @@ def test_reruns_replace_the_capsule_in_place(
 def test_each_image_has_its_own_capsule(
     git_repository: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
 ) -> None:
     pipeline = load_pipeline()
     newer_code = "d0.83.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2"
     newer = dataclasses.replace(pipeline, container_version=newer_code)
-    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
-    second = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, pipeline=newer)
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
+    second = _formed(
+        root=git_repository,
+        assets_jsonld=assets_jsonld,
+        dandiset_yaml_url=dandiset_yaml_url,
+        pipeline=newer,
+    )
     assert first.path != second.path
     assert list_capsules(git_repository) == sorted([first.path, second.path])
     assert read_provenance(first.path)["version"] == pipeline.container_version
@@ -186,12 +185,17 @@ def test_each_image_has_its_own_capsule(
 def test_each_codebase_version_has_its_own_capsule(
     git_repository: pathlib.Path,
     assets_jsonld: bytes,
-    dandiset_yaml: bytes,
+    dandiset_yaml_url: str,
 ) -> None:
     pipeline = load_pipeline()
     newer = dataclasses.replace(pipeline, codebase_version="99.0.0")
-    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
-    second = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml, pipeline=newer)
+    first = _formed(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
+    second = _formed(
+        root=git_repository,
+        assets_jsonld=assets_jsonld,
+        dandiset_yaml_url=dandiset_yaml_url,
+        pipeline=newer,
+    )
     assert first.path != second.path
     assert second.tag == f"{pipeline.container_version}-v99.0.0"
     assert second.path.name == f"pipeline-dandi+validate_tag-{pipeline.container_version}-v99.0.0"
@@ -200,8 +204,8 @@ def test_each_codebase_version_has_its_own_capsule(
 
 
 @pytest.mark.ai_generated
-def test_nothing_to_stream(git_repository: pathlib.Path, dandiset_yaml: bytes) -> None:
-    result = _prepare(root=git_repository, assets_jsonld=b"[]", dandiset_yaml=dandiset_yaml)
+def test_nothing_to_stream(git_repository: pathlib.Path, dandiset_yaml_url: str) -> None:
+    result = _prepare(root=git_repository, assets_jsonld=b"[]", dandiset_yaml_url=dandiset_yaml_url)
     assert result.capsule is None
     assert "no assets" in result.reason
 

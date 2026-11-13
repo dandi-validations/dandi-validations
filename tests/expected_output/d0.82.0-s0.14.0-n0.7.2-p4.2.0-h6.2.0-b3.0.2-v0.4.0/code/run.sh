@@ -5,17 +5,18 @@
 # `datalad containers-run`, which executes it through Apptainer and records the run. It is copied
 # into every job capsule's code/ directory, so the capsule holds the exact code that ran.
 #
-# Usage: run.sh CAPSULE_DIRECTORY DANDISET_ID PARAMETERS_FILE
+# Usage: run.sh CAPSULE_DIRECTORY DANDISET_ID PARAMETERS_FILE DANDISET_YAML_URL
 #
-#   1. Mint a DataLad dataset of the Dandiset in the capsule's sourcedata/DANDISET_ID/, around its
-#      dandiset.yaml, from the archive's S3 manifest, sourcedata/assets.jsonld. Each asset is
-#      annexed in the capsule by its SHA-256 key, with the URL of its blob on S3, and nothing is
-#      downloaded. An asset without both (e.g., a Zarr asset) cannot be streamed, and fails the
-#      run. `datalad containers-run` records the files as an output of the run, and the manifest
-#      and dandiset.yaml as its inputs.
-#   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
+#   1. Mint a DataLad dataset of the Dandiset in the capsule's sourcedata/DANDISET_ID/, from the
+#      archive's S3 manifest, sourcedata/assets.jsonld. Each asset is annexed in the capsule by its
+#      SHA-256 key, with the URL of its blob on S3, and nothing is downloaded. An asset without
+#      both (e.g., a Zarr asset) cannot be streamed, and fails the run.
+#   2. Download the Dandiset's dandiset.yaml into the dataset, from DANDISET_YAML_URL, since
+#      dandi validate finds the Dandiset's root by it. `datalad containers-run` records the dataset
+#      as an output of the run, and the manifest as its input.
+#   3. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
-#   3. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
+#   4. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
 #      directory, with dandi validate's --summary of them: the counts by severity, validator and
 #      standard. The summary is also printed to the logs.
 #
@@ -28,6 +29,7 @@ set -euo pipefail
 CAPSULE_DIRECTORY="$1"
 DANDISET_ID="$2"
 PARAMETERS_FILE="$3"
+DANDISET_YAML_URL="$4"
 
 SOURCEDATA_DIRECTORY="${CAPSULE_DIRECTORY}/sourcedata"
 MANIFEST="${SOURCEDATA_DIRECTORY}/assets.jsonld"
@@ -46,10 +48,8 @@ MIN_SEVERITY="$(parameter min_severity)"
 
 export DANDI_NO_ET=1
 
-rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY"
+rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY" "$SOURCE_DATASET"
 mkdir -p "$INTERMEDIATE_DIRECTORY"
-# What an earlier run minted goes, but dandiset.yaml is an input.
-find "$SOURCE_DATASET" -mindepth 1 ! -path "${SOURCE_DATASET}/dandiset.yaml" -delete
 
 # Apptainer binds the host's home directory, and with it the host's git configuration (signing
 # programs, hooks, ...). git and git-annex run here with a configuration of their own.
@@ -103,6 +103,9 @@ if [ "$registered" -ne "$listed" ]; then
     echo "Not every file got its S3 URL, so the Dandiset cannot be streamed." >&2
     exit 1
 fi
+# Only dandi validate needs it, to find the Dandiset's root, and it does not read its content.
+python -c 'import shutil, sys, urllib.request; shutil.copyfileobj(urllib.request.urlopen(sys.argv[1]), open(sys.argv[2], "wb"))' \
+    "$DANDISET_YAML_URL" "${SOURCE_DATASET}/dandiset.yaml"
 
 echo "=== Validating Dandiset ${DANDISET_ID} (--missing-file-content=${MISSING_FILE_CONTENT}, -J ${JOBS}) ==="
 validate_status=0

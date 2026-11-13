@@ -96,24 +96,24 @@ def _record(runner: pathlib.Path, /) -> None:
     )
 
 
-def _serve_manifest(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, ManifestFile]:
-    """Stand in for the archive's S3 bucket, which serves the version of the manifest each download was."""
+def _serve_manifest(*, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ManifestFile, str]:
+    """Stand in for the archive's S3 bucket, which serves the version of each file a download names."""
     bucket = tmp_path / "bucket"
-    bucket.mkdir()
-    downloads = {}
-    for name in ("assets.jsonld", "dandiset.yaml"):
-        shutil.copyfile(EXAMPLE_MANIFEST_DIRECTORY / name, bucket / name)
-        downloads[name] = ManifestFile(content=(bucket / name).read_bytes(), url=(bucket / name).as_uri())
-    monkeypatch.setattr("dandi_validations._capsule.fetch_assets_jsonld", lambda **_: downloads["assets.jsonld"])
-    monkeypatch.setattr("dandi_validations._capsule.fetch_dandiset_yaml", lambda **_: downloads["dandiset.yaml"])
-    return downloads
+    shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, bucket)
+    manifest = ManifestFile(content=(bucket / "assets.jsonld").read_bytes(), url=(bucket / "assets.jsonld").as_uri())
+    dandiset_yaml_url = (bucket / "dandiset.yaml").as_uri()
+    monkeypatch.setattr("dandi_validations._capsule.fetch_assets_jsonld", lambda **_: manifest)
+    monkeypatch.setattr("dandi_validations._capsule.locate_dandiset_yaml", lambda **_: dandiset_yaml_url)
+    return manifest, dandiset_yaml_url
 
 
 def _changed_manifest(tmp_path: pathlib.Path, /) -> pathlib.Path:
+    """Copy the example with the content of one of its files changed."""
     changed_manifest = tmp_path / "changed-manifest"
     shutil.copytree(EXAMPLE_MANIFEST_DIRECTORY, changed_manifest)
-    with (changed_manifest / "dandiset.yaml").open("a") as stream:
-        stream.write("description: changed\n")
+    assets = json.loads((changed_manifest / "assets.jsonld").read_text())
+    assets[0]["digest"]["dandi:sha2-256"] = "0" * 64
+    (changed_manifest / "assets.jsonld").write_text(json.dumps(assets, indent=2) + "\n")
     return changed_manifest
 
 
@@ -129,13 +129,12 @@ def test_capsule_is_a_worktree_of_the_runners_clone(tmp_path: pathlib.Path, monk
     assert dot_git.is_file() or dot_git.is_symlink()
     assert str(capsule.path) in git("worktree", "list", cwd=world.runner)
     assert git("config", "--get", "annex.private", cwd=capsule.path).strip() == "true"
-    # sourcedata/ holds the run's inputs: the manifest, and the dandiset.yaml of the dataset the run
-    # mints around it, as downloaded. The example's manifest is a frozen copy, which no URL serves,
-    # so the git-annex branch records nothing and is not pushed.
-    assert capsule.dandiset_yaml_path.read_bytes() == (EXAMPLE_MANIFEST_DIRECTORY / "dandiset.yaml").read_bytes()
+    # sourcedata/ holds the run's input, the manifest, as downloaded. The run mints the dataset it
+    # validates beside it. The example's manifest is a frozen copy, which no URL serves, so the
+    # git-annex branch records nothing and is not pushed.
     assert capsule.manifest_path.read_bytes() == (EXAMPLE_MANIFEST_DIRECTORY / "assets.jsonld").read_bytes()
     assert capsule.manifest_path.is_symlink()
-    assert list(capsule.source_dataset_directory.iterdir()) == [capsule.dandiset_yaml_path]
+    assert list(capsule.sourcedata_directory.iterdir()) == [capsule.manifest_path]
     assert set(remote_heads(root=world.runner, remote="origin")) == {"main", capsule.tag}
 
 
@@ -155,7 +154,7 @@ def test_another_runner_gets_the_capsule_back(tmp_path: pathlib.Path, monkeypatc
     recursive = tmp_path / "recursive"
     subprocess.run(["git", "clone", "--quiet", "--recurse-submodules", REPOSITORY_URL, str(recursive)], check=True)
     assert (recursive / capsule.name / "code" / "submit.sh").exists()
-    assert (recursive / capsule.name / "sourcedata" / EXAMPLE_DANDISET_ID / "dandiset.yaml").exists()
+    assert (recursive / capsule.name / "sourcedata" / "assets.jsonld").is_symlink()
 
 
 @pytest.mark.ai_generated
@@ -194,13 +193,13 @@ def test_a_fresh_clone_gets_the_manifest_from_the_version_downloaded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     world = make_world(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    downloads = _serve_manifest(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    manifest, dandiset_yaml_url = _serve_manifest(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert _claim(world.runner, manifest_directory=None) == 0
     capsule = _capsule(world.runner)
     sourcedata = read_provenance(capsule.path)["sourcedata"]
-    assert sourcedata["manifest_url"] == downloads["assets.jsonld"].url
-    assert sourcedata["dandiset_yaml_url"] == downloads["dandiset.yaml"].url
+    assert sourcedata["manifest_url"] == manifest.url
+    assert sourcedata["dandiset_yaml_url"] == dandiset_yaml_url
 
     # git-annex downloads file:// URLs, which stand in for S3 here, only once allowed.
     git("config", "--global", "annex.security.allowed-url-schemes", "http https ftp file", cwd=tmp_path)
@@ -208,7 +207,7 @@ def test_a_fresh_clone_gets_the_manifest_from_the_version_downloaded(
     git("clone", "--quiet", "--branch", capsule.tag, REPOSITORY_URL, str(fresh), cwd=tmp_path)
     git("annex", "init", "--quiet", "a reader", cwd=fresh)
     git("annex", "get", "--quiet", sourcedata["manifest"], cwd=fresh)
-    assert (fresh / sourcedata["manifest"]).read_bytes() == downloads["assets.jsonld"].content
+    assert (fresh / sourcedata["manifest"]).read_bytes() == manifest.content
 
 
 @pytest.mark.ai_generated

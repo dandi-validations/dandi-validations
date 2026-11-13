@@ -12,9 +12,9 @@
 # Run from anywhere inside the capsule's dataset. This registers the container with
 # datalad-container and executes code/run.sh in it through Apptainer with
 # `datalad containers-run`, wrapped in duct to record resource usage. The run commit records the
-# command, its inputs (the code, and the Dandiset's manifest and dandiset.yaml in sourcedata/) and
-# its outputs (the files it mints from the manifest in sourcedata/000006/, and
-# derivatives/). duct's records go to logs/.
+# command, its inputs (the code, and the Dandiset's manifest in sourcedata/) and its outputs (the
+# dataset it mints from the manifest in sourcedata/000006/, with the dandiset.yaml it
+# downloads from file://<tmp>/example/dandiset.yaml, and derivatives/). duct's records go to logs/.
 #
 # A failed run must not leave a partial output behind, since any file under the capsule's
 # derivatives/ marks it successful. Its logs are kept either way, which marks it failed.
@@ -117,10 +117,9 @@ duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "pipeline-d
         --input "${CAPSULE}/code/run.sh" \
         --input "${CAPSULE}/code/name-default.json" \
         --input "${CAPSULE}/sourcedata/assets.jsonld" \
-        --input "${CAPSULE}/sourcedata/${DANDISET_ID}/dandiset.yaml" \
         --output "${CAPSULE}/sourcedata/${DANDISET_ID}" \
         --output "${CAPSULE}/derivatives" \
-        "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/name-default.json'" &
+        "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/name-default.json' 'file://<tmp>/example/dandiset.yaml'" &
 DUCT_PID=$!
 trap stop_run TERM INT
 wait "$DUCT_PID" || run_status=$?
@@ -133,7 +132,6 @@ fi
 if [ "$run_status" -ne 0 ]; then
     rm -rf "${CAPSULE}/derivatives"
     # `datalad addurls --nosave` staged what the run minted, which only a completed run commits.
-    # The dataset is left as it was claimed, with only its dandiset.yaml.
     git reset -q -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
     git clean -q -d -f -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
     # On failure, datalad leaves the run record it would have committed in COMMIT_EDITMSG (in the
