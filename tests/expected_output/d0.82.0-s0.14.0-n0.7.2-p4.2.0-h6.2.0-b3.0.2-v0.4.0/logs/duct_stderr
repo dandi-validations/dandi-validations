@@ -1,43 +1,27 @@
 [INFO] Making sure inputs are available (this may take some time) 
 [INFO] == Command start (output follows) ===== 
-[INFO] Author identity unknown
-| 
-| *** Please tell me who you are.
-| 
-| Run
-| 
-|   git config --global user.email "you@example.com"
-|   git config --global user.name "Your Name"
-| 
-| to set your account's default identity.
-| Omit --global to set the identity only in this repository. 
-[INFO] fatal: unable to auto-detect email address (got 'root@vm.(none)') 
-[INFO] Running procedure cfg_text2git 
-[INFO] == Command start (output follows) ===== 
-It is highly recommended to configure Git before using DataLad. Set both 'user.name' and 'user.email' configuration variables.
-[INFO] == Command exit (modification check follows) ===== 
-2026-11-13 01:18:33,714 [    INFO] Validating 6 files
-2026-11-13 01:18:41,308 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:18:41,513 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:18:41,846 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:18:41,948 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:18:42,131 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:23,166 [    INFO] Validating 6 files
+2026-11-13 01:53:30,469 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:31,281 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:31,429 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:31,474 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:31,706 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
+2026-11-13 01:53:31,766 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:18:42,349 [ WARNING] Failed to retrieve NWB Inspector version due to RuntimeError: Connection to server could not be made
-2026-11-13 01:18:42,361 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
+2026-11-13 01:53:32,209 [    INFO] [1/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:18:43,036 [    INFO] [2/6] sub-anm369963/sub-anm369963_ses-20170227.nwb: 17 issues
+2026-11-13 01:53:32,348 [    INFO] [2/6] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:18:43,048 [    INFO] [3/6] sub-anm369962/sub-anm369962_ses-20170309.nwb: 17 issues
+2026-11-13 01:53:32,354 [    INFO] [3/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:18:43,079 [    INFO] [4/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
+2026-11-13 01:53:32,434 [    INFO] [4/6] sub-anm369963/sub-anm369963_ses-20170228.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"][-NELEMS:])))
-2026-11-13 01:18:43,592 [    INFO] [5/6] sub-anm369963/sub-anm369963_ses-20170226.nwb: 17 issues
+2026-11-13 01:53:32,682 [    INFO] [5/6] sub-anm369962/sub-anm369962_ses-20170310.nwb: 17 issues
 /opt/dandi-validation/.pixi/envs/default/lib/python3.13/site-packages/nwbinspector/checks/_tables.py:366: RuntimeWarning: All-NaN slice encountered
   stop_times.append(float(np.nanmax(time_intervals["stop_time"<capsule>/intermediate/validation.jsonl
 
@@ -55,6 +39,6 @@ By standard:
   N/A: 54
   NWB: 48
   DANDI-LAYOUT: 6
-2026-11-13 01:18:47,177 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.18.30Z-4939.log
-2026-11-13 01:18:48,085 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.18.48Z-7714.log
+2026-11-13 01:53:33,831 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.20Z-19007.log
+2026-11-13 01:53:34,877 [    INFO] Logs saved in /root/.local/state/dandi-cli/log/2026.11.13-01.53.34Z-21777.log
 [INFO] == Command exit (modification check follows) ===== 

@@ -4,7 +4,7 @@ Records of [`dandi validate`](https://github.com/dandi/dandi-cli) runs over [Dan
 
 Each run happens on this repository's own GitHub Actions runner (the **Validate** workflow):
 
-1. A DataLad dataset of the Dandiset is built directly from the archive's manifest from S3: every file gets its SHA-256 git-annex key and its S3 URL, and nothing is downloaded.[^sourcedata]
+1. A DataLad dataset of the Dandiset is minted directly from the archive's manifest from S3: every file gets its SHA-256 git-annex key and its S3 URL, and nothing is downloaded.[^sourcedata]
 2. `dandi validate --missing-file-content=stream` validates it, streaming only the parts of each file the validators need.
 3. The validation runs inside the `dandi-validation` image from the GitHub Container Registry (`ghcr.io/dandi-validations/dandi-validation:{version code}`), through Apptainer, with `datalad containers-run`, whose commit records the command, its inputs and its outputs.
    [duct](https://github.com/con/duct) records its resource usage.
@@ -28,8 +28,8 @@ https://github.com/dandi-validations/000006/   (main)
     ├── derivatives/  ← present only when the validation completed: validation.jsonl, all the
     │                   results, and validation_summary.txt, their counts (dandi validate --summary)
     ├── envs/dandi-validation/image  ← the image's registration (annexed, on GHCR and in a release of https://github.com/dandi-validations/dandi-validations)
-    └── sourcedata/  ← the Dandiset as validated: dandiset.yaml and the manifest
-                       (.dandi/assets.jsonld), as downloaded from S3, and every file validated
+    └── sourcedata/  ← the run's input: the manifest (assets.jsonld) and dandiset.yaml, as downloaded
+                       from S3, and its output in 000006/: the dataset minted from them and validated
 ```
 
 A capsule holds the latest validation of the Dandiset with its image and version of DANDI Validations.
@@ -39,7 +39,7 @@ To look at a capsule's results:
 
 ```bash
 git clone https://github.com/dandi-validations/000006
-git -C 000006 submodule update --init  # the capsules, without the content of their sourcedata/
+git -C 000006 submodule update --init  # the capsules, without the content of the Dandiset's files
 dandi validate --load 000006/pipeline-dandi+validate_tag-{tag}/derivatives/validation.jsonl --summary
 ```
 
@@ -57,6 +57,6 @@ datalad rerun "$(git log --format=%H --grep='DATALAD RUNCMD' -1)"  # downloads t
 
 This repository's shared files are managed by [dandi-validations/dandi-validations](https://github.com/dandi-validations/dandi-validations).
 
-[^sourcedata]: Each capsule's `sourcedata/` holds that dataset's files, registered the same way, beside the manifest itself.
+[^sourcedata]: The run records the manifest as its input and the dataset as one of its outputs, both in the capsule's `sourcedata/`.
 The manifest is annexed with the URL of the S3 version it was downloaded from.
-Any of them downloads with `datalad get`.
+Any file of either downloads with `datalad get`.

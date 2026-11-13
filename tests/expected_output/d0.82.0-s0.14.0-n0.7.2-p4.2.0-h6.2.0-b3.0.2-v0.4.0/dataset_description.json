@@ -52,10 +52,11 @@
     "branch": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0",
     "sourcedata": {
       "path": "sourcedata",
-      "manifest": "sourcedata/.dandi/assets.jsonld",
+      "manifest": "sourcedata/assets.jsonld",
       "manifest_url": null,
       "dandiset_yaml": "sourcedata/dandiset.yaml",
-      "dandiset_yaml_url": null
+      "dandiset_yaml_url": null,
+      "dataset": "sourcedata/000006"
     },
     "pipeline": "dandi+validate",
     "params_key": "default",

@@ -12,8 +12,8 @@ Each Dandiset repository is a standalone (type 2) BIDS derivative dataset of its
         ├── logs/  ← all runtime records of that run, for success or failure
         ├── derivatives/  ← the validation results (only for a completed run)
         ├── envs/  ← the image's registration
-        └── sourcedata/  ← the Dandiset as validated: its manifest, as downloaded from S3, and
-                           the dataset built from it, each file annexed with its S3 URL
+        └── sourcedata/  ← the Dandiset's manifest, as downloaded from S3 (the run's input), and
+                           the dataset the run mints from it and validates (its output)
 
 ``{tag}`` is the dandi-validation image's tag (its validator version code), followed by ``-v`` and
 the version of dandi-validations that formed the capsule. Each capsule is a DataLad dataset on the
@@ -38,7 +38,6 @@ import subprocess
 
 from ._globals import CODEBASE_URL, DANDI_ARCHIVE_URL, DEFAULT_PARAMS_KEY, ORGANIZATION, PROVENANCE_KEY
 from ._manifest import (
-    AssetRow,
     ManifestFile,
     assets_table_bytes,
     fetch_assets_jsonld,
@@ -63,8 +62,8 @@ from ._version_code import parse_version_code
 SOURCEDATA = "sourcedata"
 CAPSULE_CONTENTS = ("code", "logs", "derivatives", "intermediate", SOURCEDATA)
 SUBMITTED_MARKER_PREFIX = "submitted_date-"
-# Beside the Dandiset's files, where dandi validate does not look, as in DANDI's own DataLad mirrors.
-MANIFEST_PATH = ".dandi/assets.jsonld"
+# As the archive lays them out on S3, in dandisets/{dandiset_id}/{version}/.
+MANIFEST_PATH = "assets.jsonld"
 DANDISET_YAML = "dandiset.yaml"
 DATASET_DESCRIPTION = "dataset_description.json"
 CAPSULE_NAME_RE = re.compile(r"pipeline-(?P<pipeline>[A-Za-z0-9+]+)_tag-(?P<tag>[A-Za-z0-9_.+-]+)")
@@ -184,7 +183,7 @@ class Capsule:
     @property
     def sourcedata_directory(self) -> pathlib.Path:
         """
-        Locate the capsule's ``sourcedata/`` directory, which holds the Dandiset as validated.
+        Locate the capsule's ``sourcedata/``: the Dandiset's manifest and the dataset minted from it.
 
         Returns
         -------
@@ -206,6 +205,19 @@ class Capsule:
 
         """
         return self.sourcedata_directory / MANIFEST_PATH
+
+    @property
+    def source_dataset_directory(self) -> pathlib.Path:
+        """
+        Locate the dataset of the Dandiset that the run mints from the manifest and validates.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory, ``sourcedata/{dandiset_id}``.
+
+        """
+        return self.sourcedata_directory / self.dandiset_id
 
     @property
     def submit_script_path(self) -> pathlib.Path:
@@ -421,8 +433,6 @@ class CapsulePlan:
         The Dandiset's manifest.
     dandiset_yaml : ManifestFile
         The Dandiset's metadata.
-    assets : list[AssetRow]
-        The assets to register, which are those validated.
     assets_table : bytes
         The TSV of the assets to register.
     skipped_table : bytes or None
@@ -440,7 +450,6 @@ class CapsulePlan:
     inputs: dict
     assets_jsonld: ManifestFile
     dandiset_yaml: ManifestFile
-    assets: list[AssetRow]
     assets_table: bytes
     skipped_table: bytes | None
     number_of_assets: int
@@ -544,7 +553,6 @@ def plan_capsule(  # noqa: PLR0913
         inputs=inputs,
         assets_jsonld=manifest,
         dandiset_yaml=metadata,
-        assets=rows,
         assets_table=assets_table,
         skipped_table=skipped_table_bytes(skipped) if skipped else None,
         number_of_assets=len(rows),
@@ -578,9 +586,9 @@ def write_capsule(*, plan: CapsulePlan, now: datetime.datetime | None = None) ->
     Replace a capsule's code, source data and results with the next run's, and record its provenance.
 
     Only what a run writes is replaced. The capsule's dataset, image registration and history stay.
-    The Dandiset's manifest and metadata are written to ``sourcedata/`` as they were downloaded.
-    Annexing them, and registering the Dandiset's files beside them, needs git-annex (see
-    ``annex_sourcedata``).
+    The Dandiset's manifest and metadata are written to ``sourcedata/`` as they were downloaded,
+    as the run's inputs. Annexing the manifest needs git-annex (see ``annex_manifest``). The run
+    mints the dataset it validates from them, in ``sourcedata/{dandiset_id}/``.
 
     Parameters
     ----------
@@ -713,6 +721,7 @@ def _write_sourcedata(*, capsule: Capsule, assets_jsonld: ManifestFile, dandiset
         "manifest_url": assets_jsonld.url,
         "dandiset_yaml": f"{SOURCEDATA}/{DANDISET_YAML}",
         "dandiset_yaml_url": dandiset_yaml.url,
+        "dataset": capsule.source_dataset_directory.relative_to(capsule.path).as_posix(),
     }
 
 

@@ -65,7 +65,7 @@ REGENERATE = os.environ.get("DANDI_VALIDATIONS_REGENERATE_EXPECTED_OUTPUT") == "
 
 # What the run writes into a claimed capsule, and what it changes there: `datalad containers-add`
 # registers the image in the capsule's DataLad configuration.
-RUN_OUTPUTS = ("logs/", "derivatives/", "envs/")
+RUN_OUTPUTS = ("logs/", "derivatives/", "envs/", f"sourcedata/{EXAMPLE_DANDISET_ID}/")
 CHANGED_BY_RUN = (".datalad/config",)
 # These logs hold progress output and samples taken while the run goes. Their expected copies show
 # one run, and only their presence is checked.
@@ -96,7 +96,8 @@ _DATASET_ID_RE = re.compile(
     r"((?:^|\s)(?:datalad-)?id = )[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
     re.MULTILINE,
 )
-_INTERMEDIATE_PATH_RE = re.compile(r'"[^"]*?/intermediate/')
+# Where the run's files are, in the results and logs, which a version bump would otherwise rename.
+_CAPSULE_PATH_RE = re.compile(rf'"[^"]*?/(intermediate/|sourcedata/(?={EXAMPLE_DANDISET_ID}[/"]))')
 _ANNEX_OBJECT_RE = re.compile(r"\.git/annex/objects/\S+")
 # Only the image's key depends on how it was built. The Dandiset's files and manifest have theirs
 # from the frozen example, so sourcedata/ shows them as they are.
@@ -220,7 +221,7 @@ def normalize(*, text: str, names: dict[str, str]) -> str:
     for value, name in sorted(names.items(), key=lambda item: -len(item[0])):
         text = text.replace(value, name)
     text = _DATASET_ID_RE.sub(r"\1<datalad dataset id>", text)
-    return _INTERMEDIATE_PATH_RE.sub('"<capsule>/intermediate/', text)
+    return _CAPSULE_PATH_RE.sub(r'"<capsule>/\1', text)
 
 
 def _vary(value: object, /) -> object:
@@ -404,6 +405,11 @@ def test_validated_capsule_matches_expected_output(
         shutil.copytree(actual, os.environ[ACTUAL_OUTPUT_VARIABLE], dirs_exist_ok=True)
     assert_matches_expected(actual=actual, expected=EXPECTED_OUTPUT_DIRECTORY)
     assert "[DATALAD RUNCMD]" in git("log", "--format=%s", pipeline.tag, cwd=world.repository)
+    # The run registered each file it minted in the clone's one git-annex, whose branch records
+    # where each file downloads from for every clone.
+    recorded = git("log", "--patch", "git-annex", cwd=world.repository)
+    validated = git("show", f"{pipeline.tag}:code/assets.tsv", cwd=world.repository).splitlines()[1:]
+    assert [row.split("\t")[3] for row in validated if row.split("\t")[3] not in recorded] == []
 
     # A second run finds the successful capsule and does nothing.
     with caplog.at_level(logging.INFO):

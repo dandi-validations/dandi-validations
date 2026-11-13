@@ -7,11 +7,11 @@
 #
 # Usage: run.sh CAPSULE_DIRECTORY DANDISET_ID PARAMETERS_FILE
 #
-#   1. Build a DataLad dataset of the Dandiset from code/assets.tsv (derived from the archive's
-#      assets.jsonld on S3, which the capsule keeps in sourcedata/.dandi/) and
-#      sourcedata/dandiset.yaml: each file gets its SHA-256 git-annex key and its S3 URL, and
-#      nothing is downloaded. The capsule's sourcedata/ holds the same files, registered the
-#      same way.
+#   1. Mint a DataLad dataset of the Dandiset in the capsule's sourcedata/DANDISET_ID/, from
+#      sourcedata/dandiset.yaml and code/assets.tsv (the files that the archive's S3 manifest,
+#      sourcedata/assets.jsonld, lists as streamable). Each file is annexed in the capsule by its
+#      SHA-256 key, with its S3 URL, and nothing is downloaded. `datalad containers-run` records
+#      the dataset as an output of the run, beside the manifest as its input.
 #   2. Run `dandi validate --missing-file-content=stream` on it, so that the content-dependent
 #      validators (pynwb, nwbinspector) read only what they need, straight from S3.
 #   3. Write the results (JSON Lines, as dandi validate writes them) to the capsule's derivatives/
@@ -32,7 +32,7 @@ CODE_DIRECTORY="${CAPSULE_DIRECTORY}/code"
 SOURCEDATA_DIRECTORY="${CAPSULE_DIRECTORY}/sourcedata"
 INTERMEDIATE_DIRECTORY="${CAPSULE_DIRECTORY}/intermediate"
 OUTPUT_DIRECTORY="${CAPSULE_DIRECTORY}/derivatives"
-SOURCE_DATASET="${INTERMEDIATE_DIRECTORY}/${DANDISET_ID}"
+SOURCE_DATASET="${SOURCEDATA_DIRECTORY}/${DANDISET_ID}"
 RESULTS_FILE="${INTERMEDIATE_DIRECTORY}/validation.jsonl"
 SUMMARY_FILE="${INTERMEDIATE_DIRECTORY}/validation_summary.txt"
 
@@ -45,15 +45,20 @@ MIN_SEVERITY="$(parameter min_severity)"
 
 export DANDI_NO_ET=1
 
-rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY"
+rm -rf "$INTERMEDIATE_DIRECTORY" "$OUTPUT_DIRECTORY" "$SOURCE_DATASET"
 mkdir -p "$INTERMEDIATE_DIRECTORY"
 
 # Apptainer binds the host's home directory, and with it the host's git configuration (signing
-# programs, hooks, ...). The throwaway source dataset is built with a configuration of its own.
+# programs, hooks, ...). git and git-annex run here with a configuration of their own.
 export GIT_CONFIG_GLOBAL="${INTERMEDIATE_DIRECTORY}/gitconfig"
 export GIT_CONFIG_NOSYSTEM=1
 git config --global user.name "dandi-validations"
 git config --global user.email "dandi-validations@users.noreply.github.com"
+# git-annex in the image cannot use the network (it has no /etc/protocols), and it would probe the
+# capsule's git remotes for an annex. They hold none: the content is on S3.
+for remote in $(git -C "$CAPSULE_DIRECTORY" remote); do
+    git config --global "remote.${remote}.annex-ignore" true
+done
 
 echo "=== dandi-validation image ==="
 python -c \
@@ -61,15 +66,22 @@ python -c \
     /opt/dandi-validation/versions.json \
     || echo "(no version record in this image)"
 
-echo "=== Building the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="
+echo "=== Minting the DataLad dataset of Dandiset ${DANDISET_ID} from its S3 manifest ==="
 ASSETS_TABLE="${CODE_DIRECTORY}/assets.tsv"
-datalad create -c text2git "$SOURCE_DATASET"
+mkdir -p "$SOURCE_DATASET"
 cp "${SOURCEDATA_DIRECTORY}/dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
-datalad save -d "$SOURCE_DATASET" -m "Add dandiset.yaml" "${SOURCE_DATASET}/dandiset.yaml"
-datalad addurls -d "$SOURCE_DATASET" --input-type tsv --exclude-autometa '.*' \
+# Unsaved, so that `datalad containers-run` saves the files in the run's own commit.
+datalad addurls -d "$CAPSULE_DIRECTORY" --nosave --input-type tsv --exclude-autometa '.*' \
     --key 'et:SHA256-s{size}--{sha256}' \
-    "$ASSETS_TABLE" '{url}' '{path}'
-echo "Registered $(git -C "$SOURCE_DATASET" annex find --include='*' | wc -l) annexed files (none downloaded)."
+    "$ASSETS_TABLE" '{url}' "sourcedata/${DANDISET_ID}/{path}"
+# addurls only logs a URL it failed to register, and a file without one cannot be streamed.
+listed="$(( $(wc -l < "$ASSETS_TABLE") - 1 ))"
+registered="$(git -C "$SOURCE_DATASET" annex find --in=web | wc -l)"
+echo "Registered ${registered} of ${listed} files with their S3 URLs (none downloaded)."
+if [ "$registered" -ne "$listed" ]; then
+    echo "Not every file got its S3 URL, so the Dandiset cannot be streamed." >&2
+    exit 1
+fi
 
 echo "=== Validating Dandiset ${DANDISET_ID} (--missing-file-content=${MISSING_FILE_CONTENT}, -J ${JOBS}) ==="
 validate_status=0

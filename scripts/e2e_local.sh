@@ -94,12 +94,12 @@ git clone --quiet "$REMOTE" "$CLONE"
 cd "$CLONE"
 dandi-validations run --dandiset "$DANDISET_ID" --push origin --timeout 60
 
-python - "$IMAGE" "$CODE" "$TAG" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" <<'EOF'
+python - "$IMAGE" "$CODE" "$TAG" "$DANDI_VALIDATIONS_IMAGE_DIGEST" "$REMOTE" "$DANDISET_ID" <<'EOF'
 import json, pathlib, subprocess, sys
 
 from dandi_validations import capsule_row, read_provenance
 
-image, code, tag, digest, remote = sys.argv[1:]
+image, code, tag, digest, remote, dandiset_id = sys.argv[1:]
 
 
 def git(*arguments):
@@ -114,24 +114,28 @@ assert json.loads(git("show", "main:dataset_description.json"))["DatasetType"] =
 # The branch named by the capsule's tag: the capsule at its root (a study dataset), its image's
 # registration and its run record.
 files = set(git("ls-tree", "-r", "--name-only", tag).split())
-assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata/dandiset.yaml", "sourcedata/.dandi/assets.jsonld"} <= files
+assert {"envs/dandi-validation/image", "code/submit.sh", "sourcedata/dandiset.yaml", "sourcedata/assets.jsonld"} <= files
 assert {"derivatives/validation.jsonl", "derivatives/validation_summary.txt"} <= files
 assert {"logs/duct_info.json", "logs/container_versions.json", "logs/run.json", "logs/submit.log"} <= files
 assert not any(path.startswith("pipeline-") for path in files), files
 assert json.loads(git("show", f"{tag}:dataset_description.json"))["DatasetType"] == "study"
 assert "[DATALAD RUNCMD]" in git("log", "--format=%s", tag)
-# sourcedata/ holds the manifest and a link to the annexed key of every file validated.
-links = [line for line in git("ls-tree", "-r", tag, "sourcedata").splitlines() if line.startswith("120000 ")]
+# sourcedata/ holds the run's input, the manifest, and its output: the dataset minted from it, with
+# a link to the annexed key of every file validated.
+dataset = f"sourcedata/{dandiset_id}"
+assert git("ls-tree", tag, "sourcedata/assets.jsonld").startswith("120000 ")
+links = [line for line in git("ls-tree", "-r", tag, dataset).splitlines() if line.startswith("120000 ")]
 validated = git("show", f"{tag}:code/assets.tsv").splitlines()[1:]
-assert len(links) == len(validated) + 1, (len(links), len(validated))
+assert len(links) == len(validated), (len(links), len(validated))
 
 capsule = pathlib.Path.cwd() / name
 provenance = read_provenance(capsule)
 assert provenance["image"] == f"{image}:{code}" and provenance["image_digest"] == digest, provenance
-# The git-annex branch records where the manifest's version downloads from.
+# The git-annex branch records where the manifest's version, and every file validated, download from.
 manifest_url = provenance["sourcedata"]["manifest_url"]
 assert "?versionId=" in manifest_url, manifest_url
-assert git("grep", "--fixed-strings", "--files-with-matches", manifest_url, "git-annex"), manifest_url
+recorded = git("log", "--patch", "git-annex")
+assert [url for url in [manifest_url, *(row.split("\t")[3] for row in validated)] if url not in recorded] == []
 row = capsule_row(capsule)
 assert row["status"] == "successful", row
 assert row["files_streamed"] == row["assets"], (row["files_streamed"], row["assets"])

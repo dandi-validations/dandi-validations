@@ -17,27 +17,15 @@
     "bidsschematools": "1.2.7"
   },
   "git": "git version 2.56.0",
-  "git_annex": "10.20260717-g0c917920c80ab1e8cc3d8f5886537708949e1659"<capsule>/intermediate/000006 (dataset) [/opt/dandi-validation/.pixi/envs/default...]
-create(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006 (dataset)
-action summary:
-  create (ok: 1)
-  run (ok: 1)
-add(ok): dandiset.yaml (file)
-save(ok): . (dataset)
-action summary:
-  add (ok: 1)
-  save (ok: 1)
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170309.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170310.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369962/sub-anm369962_ses-20170313.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170227.nwb (file) [registered URL]
-fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/intermediate/000006/sub-anm369963/sub-anm369963_ses-20170228.nwb (file) [registered URL]
-save(ok): . (dataset)
+  "git_annex": "10.20260717-g0c917920c80ab1e8cc3d8f5886537708949e1659"<capsule>/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170309.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170310.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170313.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170227.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170228.nwb (file) [registered URL]
 action summary:
   fromkey (ok: 6)
-  save (ok: 1)
-Registered 6 annexed files (none downloaded).
+Registered 6 of 6 files with their S3 URLs (none downloaded).
 === Validating Dandiset 000006 (--missing-file-content=stream, -J 8) ===
 dandi validate exited with 1
 === Summarizing results ===
@@ -45,9 +33,10 @@ dandi validate exited with 1
 run(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0 (dataset) [apptainer exec --cleanenv envs/dandi-val...]
 add(ok): derivatives/validation.jsonl (file)
 add(ok): derivatives/validation_summary.txt (file)
+add(ok): sourcedata/000006/dandiset.yaml (file)
 save(ok): . (dataset)
 action summary:
-  add (ok: 2)
-  get (notneeded: 5)
+  add (ok: 3)
+  get (notneeded: 6)
   run (ok: 1)
   save (ok: 1)

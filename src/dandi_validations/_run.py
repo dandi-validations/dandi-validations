@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 from ._branches import (
-    annex_sourcedata,
+    annex_manifest,
     capsule_branches,
     checkout_capsule,
     commit_capsule,
@@ -105,9 +105,10 @@ def run_job(  # noqa: PLR0913
 
     The capsule's branch is checked out (or started) as a worktree of this clone, and its run is
     committed to it. Main's submodule for it is pinned to the result, both when the run is claimed
-    and when it is recorded. The capsule's ``sourcedata/`` holds the Dandiset's manifest and a file
-    for each asset validated, whose S3 URLs are recorded in the git-annex branch when the run is
-    claimed. After the run, the URL the image is published at is recorded there too. ``datalad
+    and when it is recorded. The capsule's ``sourcedata/`` holds the Dandiset's manifest, the run's
+    input, whose S3 URL is recorded in the git-annex branch when the run is claimed. The run mints
+    the dataset it validates from it, as one of its outputs, and records each file's S3 URL there
+    too. After the run, the URL the image is published at is recorded there as well. ``datalad
     get`` can then download any of them. With ``push_to``, the clone is first rebased onto the
     remote's main, and both branches are pushed at each point, with the git-annex branch once it
     records anything.
@@ -179,7 +180,7 @@ def run_job(  # noqa: PLR0913
         return 0
 
     write_capsule(plan=plan, now=now)
-    annex_sourcedata(capsule=capsule, assets=plan.assets, manifest_url=plan.assets_jsonld.url)
+    annex_manifest(capsule=capsule, url=plan.assets_jsonld.url)
     _log.info("Formed %s for %d assets.", capsule.name, plan.number_of_assets)
 
     # Claiming the capsule before running it makes a run that never reports back read as stalled.

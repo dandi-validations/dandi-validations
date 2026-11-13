@@ -4,6 +4,6 @@
 envs/** annex.largefiles=anything
 # The Dandiset's manifest and files are annexed: only their keys are recorded; their content is on S3.
 sourcedata/** annex.largefiles=anything
-sourcedata/dandiset.yaml annex.largefiles=nothing
+sourcedata/**/dandiset.yaml annex.largefiles=nothing
 # The summary only counts what validation.jsonl holds, so GitHub collapses it in diffs.
 derivatives/validation_summary.txt linguist-generated=true
