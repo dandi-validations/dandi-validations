@@ -199,7 +199,7 @@ def test_sourcedata_is_the_dataset_that_run_sh_validates(
     sourcedata = _annexed(root=capsule.path, directory="sourcedata")
     manifest_key, manifest_urls = sourcedata.pop(".dandi/assets.jsonld")
     assert sourcedata == _annexed(root=built, directory=".")
-    assert len(sourcedata) == 53
+    assert len(sourcedata) == 6
     assert (built / "dandiset.yaml").read_bytes() == (capsule.sourcedata_directory / "dandiset.yaml").read_bytes()
     # The example's manifest is a frozen copy, which no URL serves.
     assert manifest_key.startswith("SHA256E-s")
@@ -440,7 +440,7 @@ def test_collect_reads_capsules_through_mains_submodules(
     assert {key: row[key] for key in ("capsule", "status", "assets")} == {
         "capsule": capsule.name,
         "status": "stalled",
-        "assets": "53",
+        "assets": "6",
     }
     assert json.loads((tmp_path / "records" / "capsules.json").read_text())["status"]["Levels"]
     assert [path.name for path in written] == ["capsules.tsv", "capsules.json"]

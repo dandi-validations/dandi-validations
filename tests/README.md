@@ -5,6 +5,7 @@
 The integration tests all run on one example, so that what a job should produce can be read here, file by file: **Dandiset 000006**.
 
 **Input:** [`example_dandiset/000006/`](example_dandiset/000006) holds the archive's S3 manifest of the Dandiset's draft (`assets.jsonld`, pretty-printed for reading, and `dandiset.yaml`).
+Its `assets.jsonld` is cut down to the first three sessions of the first two subjects, so that a run streams only six files.
 It is frozen so that the expectations don't drift with the archive.
 Jobs read it instead of S3 (`dandi-validations run --manifest ...`).
 
@@ -17,7 +18,7 @@ It has one directory per branch:
   - `logs/` holds duct's records (`duct_info.json`, `duct_usage.jsonl`, `duct_stdout`, `duct_stderr`), the image's versions (`container_versions.json`), the run's record (`run.json`) and the output of `submit.sh` (`submit.log`).
   - `derivatives/` holds every result in `validation.jsonl`, and their counts by severity, validator and standard in `validation_summary.txt` (`dandi validate --summary`).
     `dandi validate` writes the results in whatever order its workers finish, so they are compared sorted by file, then issue.
-  - `sourcedata/` holds the example's `dandiset.yaml` and manifest (`.dandi/assets.jsonld`), and a link to the annexed key of each of the 53 files validated.
+  - `sourcedata/` holds the example's `dandiset.yaml` and manifest (`.dandi/assets.jsonld`), and a link to the annexed key of each of the 6 files validated.
   - `envs/` registers the image.
 
 [`test_expected_output.py`](test_expected_output.py) checks it with two tests.

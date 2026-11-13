@@ -38,7 +38,7 @@
     "dandiset_version": "draft",
     "version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
     "params": "859c878",
-    "source_digest": "85485862335f0f925d220b5f2eb6718da7a98d4a271e2558024cdb9fcd41ccd3",
+    "source_digest": "236011cd20767b3c486a012866af645f0af7adb5049bdffc06bca32ca78f843a",
     "validator_versions": {
       "dandi": "0.82.0",
       "dandischema": "0.14.0",
@@ -59,7 +59,7 @@
     },
     "pipeline": "dandi+validate",
     "params_key": "default",
-    "assets": 53,
+    "assets": 6,
     "skipped_assets": 0,
     "assets_file": "code/assets.tsv",
     "dandi_cli": {

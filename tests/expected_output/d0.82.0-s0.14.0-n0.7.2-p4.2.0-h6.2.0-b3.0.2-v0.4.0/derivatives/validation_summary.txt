@@ -1,14 +1,14 @@
 --- Validation Summary ---
-Total issues: 946
+Total issues: 108
 By severity:
-  ERROR: 576
-  WARNING: 317
-  INFO: 53
+  ERROR: 66
+  WARNING: 36
+  INFO: 6
 By validator:
-  nwbinspector: 469
-  pynwb: 424
-  dandi: 53
+  nwbinspector: 54
+  pynwb: 48
+  dandi: 6
 By standard:
-  N/A: 469
-  NWB: 424
-  DANDI-LAYOUT: 53
+  N/A: 54
+  NWB: 48
+  DANDI-LAYOUT: 6
