@@ -1,4 +1,0 @@
-[submodule "sourcedata"]
-	path = sourcedata
-	url = https://github.com/dandisets/000006
-	branch = draft

@@ -10,12 +10,12 @@ import subprocess
 import sys
 
 from ._branches import (
+    annex_manifest,
     capsule_branches,
     checkout_capsule,
     commit_capsule,
     commit_main,
     create_capsule,
-    link_sourcedata,
     prune_submodules,
     publish_capsule,
     register_image_url,
@@ -105,10 +105,13 @@ def run_job(  # noqa: PLR0913
 
     The capsule's branch is checked out (or started) as a worktree of this clone, and its run is
     committed to it. Main's submodule for it is pinned to the result, both when the run is claimed
-    and when it is recorded. After the run, the URL the image is published at is recorded in the
-    git-annex branch, so that ``datalad get`` can download it. With ``push_to``, the clone is first
-    rebased onto the remote's main, and both branches are pushed at each point, with the git-annex
-    branch once it records anything.
+    and when it is recorded. The capsule's ``sourcedata/`` holds the Dandiset's manifest, the run's
+    input, whose S3 URL is recorded in the git-annex branch when the run is claimed. The run mints
+    the dataset it validates from it, as one of its outputs, and records each file's S3 URL there
+    too. After the run, the URL the image is published at is recorded there as well. ``datalad
+    get`` can then download any of them. With ``push_to``, the clone is first rebased onto the
+    remote's main, and both branches are pushed at each point, with the git-annex branch once it
+    records anything.
 
     Parameters
     ----------
@@ -131,6 +134,8 @@ def run_job(  # noqa: PLR0913
     manifest_directory : pathlib.Path or None, default=None
         A directory holding the Dandiset's ``assets.jsonld`` and ``dandiset.yaml`` to use instead
         of the archive's current ones on S3 (e.g., a frozen copy, to rerun a capsule or test).
+        No URL is known for a copy, so its manifest's content stays in this clone. The run downloads
+        its ``dandiset.yaml`` by its ``file://`` URL, so the image must see the directory.
     execute : bool, default=True
         Whether to run the capsule, rather than only form and claim it.
     now : datetime.datetime or None, default=None
@@ -153,17 +158,17 @@ def run_job(  # noqa: PLR0913
     # One git-annex for main and every capsule worktree, private to this ephemeral clone.
     ensure_annex(root=root, remote=push_to)
 
-    assets_jsonld = dandiset_yaml = None
+    assets_jsonld = dandiset_yaml_url = None
     if manifest_directory is not None:
         assets_jsonld = (manifest_directory / "assets.jsonld").read_bytes()
-        dandiset_yaml = (manifest_directory / "dandiset.yaml").read_bytes()
+        dandiset_yaml_url = (manifest_directory / "dandiset.yaml").resolve().as_uri()
     plan = plan_capsule(
         repository_root=root,
         dandiset_id=dandiset_id,
         dandiset_version=dandiset_version,
         params_key=params_key,
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
     )
     if isinstance(plan, str):
         _log.info("%s", plan)
@@ -175,10 +180,8 @@ def run_job(  # noqa: PLR0913
         _log.info("%s already validated these inputs; nothing to do (use --force to validate again).", capsule.name)
         return 0
 
-    sourcedata = link_sourcedata(capsule=capsule)
-    if sourcedata is None:
-        _log.info("Dandiset %s has no DataLad mirror to link as sourcedata/.", dandiset_id)
-    write_capsule(plan=plan, sourcedata=sourcedata, now=now)
+    write_capsule(plan=plan, now=now)
+    annex_manifest(capsule=capsule, url=plan.assets_jsonld.url)
     _log.info("Formed %s for %d assets.", capsule.name, plan.number_of_assets)
 
     # Claiming the capsule before running it makes a run that never reports back read as stalled.

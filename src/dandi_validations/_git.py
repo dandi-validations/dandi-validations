@@ -12,7 +12,13 @@ _log = logging.getLogger(__name__)
 ANNEX_BRANCH = "git-annex"
 
 
-def run(*, command: list[str], cwd: pathlib.Path, check: bool = True) -> subprocess.CompletedProcess:
+def run(
+    *,
+    command: list[str],
+    cwd: pathlib.Path,
+    check: bool = True,
+    stdin: str | None = None,
+) -> subprocess.CompletedProcess:
     """
     Run a command and capture its output.
 
@@ -24,6 +30,8 @@ def run(*, command: list[str], cwd: pathlib.Path, check: bool = True) -> subproc
         The directory to run it in.
     check : bool, default=True
         Whether to raise when the command fails.
+    stdin : str or None, default=None
+        Text to give the command on its standard input (e.g., the lines of a git-annex ``--batch``).
 
     Returns
     -------
@@ -37,7 +45,7 @@ def run(*, command: list[str], cwd: pathlib.Path, check: bool = True) -> subproc
 
     """
     _log.debug("Running %s in %s", command, cwd)
-    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, cwd=cwd, input=stdin, capture_output=True, text=True, check=False)
     if check and result.returncode != 0:
         message = (
             f"Command {command} failed in {cwd} with exit code {result.returncode}.\n"

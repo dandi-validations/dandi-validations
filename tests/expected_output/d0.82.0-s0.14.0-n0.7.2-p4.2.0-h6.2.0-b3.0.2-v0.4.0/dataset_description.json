@@ -23,7 +23,7 @@
     {
       "Name": "DANDI Validations: Code",
       "Description": "Orchestration of validation jobs on GitHub Actions.",
-      "Version": "v0.3.1+0000000000000000000000000000000000000000",
+      "Version": "v0.4.0+0000000000000000000000000000000000000000",
       "CodeURL": "https://github.com/dandi-validations/dandi-validations"
     }
   ],
@@ -31,10 +31,6 @@
     {
       "URL": "https://dandiarchive.org/dandiset/000006/draft",
       "Version": "draft"
-    },
-    {
-      "URL": "https://github.com/dandisets/000006",
-      "Version": "<head of dandisets/000006 draft>"
     }
   ],
   "DandiValidations": {
@@ -42,7 +38,7 @@
     "dandiset_version": "draft",
     "version": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
     "params": "859c878",
-    "source_digest": "85485862335f0f925d220b5f2eb6718da7a98d4a271e2558024cdb9fcd41ccd3",
+    "source_digest": "a7d134f2922a083ee8bd9eb8f3e44eeb335ef131640808f11a2e880d5337680a",
     "validator_versions": {
       "dandi": "0.82.0",
       "dandischema": "0.14.0",
@@ -53,25 +49,25 @@
     },
     "image": "ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2",
     "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "branch": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.1",
+    "branch": "d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0",
     "sourcedata": {
       "path": "sourcedata",
-      "url": "https://github.com/dandisets/000006",
-      "branch": "draft",
-      "commit": "<head of dandisets/000006 draft>"
+      "manifest": "sourcedata/assets.jsonld",
+      "manifest_url": null,
+      "dandiset_yaml": "sourcedata/000006/dandiset.yaml",
+      "dandiset_yaml_url": "file://<tmp>/example/dandiset.yaml",
+      "dataset": "sourcedata/000006"
     },
     "pipeline": "dandi+validate",
     "params_key": "default",
-    "assets": 53,
-    "skipped_assets": 0,
-    "assets_file": "code/assets.tsv",
+    "assets": 6,
     "dandi_cli": {
       "commit": "bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
       "code_url": "https://github.com/dandi/dandi-cli/tree/bec91fa43fb3a58d8bb9fa8cb51e6e70199e754e",
       "reference": "https://github.com/dandi/dandi-cli/pull/1956"
     },
-    "codebase": "v0.3.1",
-    "codebase_version": "v0.3.1+0000000000000000000000000000000000000000",
+    "codebase": "v0.4.0",
+    "codebase_version": "v0.4.0+0000000000000000000000000000000000000000",
     "created_at": "2026-11-05T20:31:05+00:00"
   }
 }

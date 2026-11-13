@@ -1,5 +1,5 @@
 #!/bin/bash
-# DANDI Validations capsule pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.1
+# DANDI Validations capsule pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0
 #
 #   What:      dandi validate, streaming (dandi/dandi-cli#1956), of Dandiset 000006 (draft)
 #   Image:     ghcr.io/dandi-validations/dandi-validation:d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2
@@ -7,12 +7,14 @@
 #              (oras://ghcr.io/dandi-validations/dandi-validation:sif-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2 as an Apptainer SIF)
 #              (the same SIF, which git-annex downloads: https://github.com/dandi-validations/dandi-validations/releases/download/sif-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2/dandi-validation_d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2.sif)
 #   Where:     a GitHub Actions runner of https://github.com/dandi-validations/000006,
-#              in the capsule's DataLad dataset: branch d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.1
+#              in the capsule's DataLad dataset: branch d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0
 #
 # Run from anywhere inside the capsule's dataset. This registers the container with
 # datalad-container and executes code/run.sh in it through Apptainer with
 # `datalad containers-run`, wrapped in duct to record resource usage. The run commit records the
-# command, its inputs and its outputs (derivatives/). duct's records go to logs/.
+# command, its inputs (the code, and the Dandiset's manifest in sourcedata/) and its outputs (the
+# dataset it mints from the manifest in sourcedata/000006/, with the dandiset.yaml it
+# downloads from file://<tmp>/example/dandiset.yaml, and derivatives/). duct's records go to logs/.
 #
 # A failed run must not leave a partial output behind, since any file under the capsule's
 # derivatives/ marks it successful. Its logs are kept either way, which marks it failed.
@@ -107,17 +109,17 @@ stop_run() {
 }
 
 run_status=0
-duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.1: dandi validate ${DANDISET_ID}" \
+duct --output-prefix "${CAPSULE}/logs/duct_" --fail-time 0 --message "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0: dandi validate ${DANDISET_ID}" \
     datalad containers-run \
         --container-name "$CONTAINER_NAME" \
         --explicit \
-        --message "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.3.1: dandi validate (streaming) of Dandiset ${DANDISET_ID} (draft)" \
+        --message "pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0: dandi validate (streaming) of Dandiset ${DANDISET_ID} (draft)" \
         --input "${CAPSULE}/code/run.sh" \
         --input "${CAPSULE}/code/name-default.json" \
-        --input "${CAPSULE}/code/dandiset.yaml" \
-        --input "${CAPSULE}/code/assets.tsv" \
+        --input "${CAPSULE}/sourcedata/assets.jsonld" \
+        --output "${CAPSULE}/sourcedata/${DANDISET_ID}" \
         --output "${CAPSULE}/derivatives" \
-        "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/name-default.json'" &
+        "bash '${CAPSULE}/code/run.sh' '${CAPSULE}' '${DANDISET_ID}' '${CAPSULE}/code/name-default.json' 'file://<tmp>/example/dandiset.yaml'" &
 DUCT_PID=$!
 trap stop_run TERM INT
 wait "$DUCT_PID" || run_status=$?
@@ -129,6 +131,9 @@ fi
 
 if [ "$run_status" -ne 0 ]; then
     rm -rf "${CAPSULE}/derivatives"
+    # `datalad addurls --nosave` staged what the run minted, which only a completed run commits.
+    git reset -q -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
+    git clean -q -d -f -- "${CAPSULE}/sourcedata/${DANDISET_ID}"
     # On failure, datalad leaves the run record it would have committed in COMMIT_EDITMSG (in the
     # git directory, which for a worktree is not .git/).
     commit_message="$(git rev-parse --git-dir)/COMMIT_EDITMSG"

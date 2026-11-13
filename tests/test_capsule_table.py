@@ -14,12 +14,12 @@ from dandi_validations import (
 )
 
 
-def _successful_capsule(*, root: pathlib.Path, assets_jsonld: bytes, dandiset_yaml: bytes) -> Capsule:
+def _successful_capsule(*, root: pathlib.Path, assets_jsonld: bytes, dandiset_yaml_url: str) -> Capsule:
     capsule = prepare_capsule(
         repository_root=root,
         dandiset_id="000123",
         assets_jsonld=assets_jsonld,
-        dandiset_yaml=dandiset_yaml,
+        dandiset_yaml_url=dandiset_yaml_url,
     ).capsule
     assert capsule is not None
     capsule.logs_directory.mkdir()
@@ -42,8 +42,8 @@ def _successful_capsule(*, root: pathlib.Path, assets_jsonld: bytes, dandiset_ya
 
 
 @pytest.mark.ai_generated
-def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandiset_yaml: bytes) -> None:
-    capsule = _successful_capsule(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml=dandiset_yaml)
+def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandiset_yaml_url: str) -> None:
+    capsule = _successful_capsule(root=git_repository, assets_jsonld=assets_jsonld, dandiset_yaml_url=dandiset_yaml_url)
     row = capsule_row(capsule.path)
     assert list(row) == list(CAPSULE_TABLE_COLUMNS)
     expected = {
@@ -62,7 +62,6 @@ def test_capsule_row(git_repository: pathlib.Path, assets_jsonld: bytes, dandise
         "files_with_issues": 2,
         "wall_clock_seconds": 41.9,
         "assets": 2,
-        "skipped_assets": 2,
     }
     assert {key: row[key] for key in expected} == expected
     assert row["claimed_by"].startswith(("local:", "https://"))

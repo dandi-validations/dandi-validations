@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-DANDISET_YAML = b"identifier: DANDI:000123\nname: A test Dandiset\n"
+DANDISET_YAML_URL = "https://dandiarchive.s3.amazonaws.com/dandisets/000123/draft/dandiset.yaml?versionId=v1"
 
 
 def make_asset(
@@ -52,20 +52,18 @@ def offline_image_digest(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def assets_jsonld() -> bytes:
-    """Describe four assets, two of which can be streamed."""
+    """Describe two assets."""
     assets = [
         make_asset(path="sub-02/sub-02_ses-1.nwb", sha256="b" * 64),
         make_asset(path="sub-01/sub-01_ses-1.nwb", sha256="c" * 64),
-        make_asset(path="sub-03/sub-03.ome.zarr", sha256=None, encoding_format="application/x-zarr"),
-        make_asset(path="sub-04/sub-04_ses-1.nwb", sha256=None),
     ]
     return json.dumps(assets).encode()
 
 
 @pytest.fixture
-def dandiset_yaml() -> bytes:
-    """Describe the Dandiset."""
-    return DANDISET_YAML
+def dandiset_yaml_url() -> str:
+    """Locate the Dandiset's dandiset.yaml, which the run downloads."""
+    return DANDISET_YAML_URL
 
 
 @pytest.fixture

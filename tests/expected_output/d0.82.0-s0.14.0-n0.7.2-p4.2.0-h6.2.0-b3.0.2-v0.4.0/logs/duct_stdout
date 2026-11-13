@@ -1,0 +1,45 @@
+=== dandi-validation image ===
+{
+  "validator_versions": {
+    "dandi": "0.82.0+28.gbec91fa4",
+    "dandischema": "0.14.0",
+    "nwbinspector": "0.7.2",
+    "pynwb": "4.2.0",
+    "hdmf": "6.2.0",
+    "bids-validator-deno": "3.0.2"
+  },
+  "tool_versions": {
+    "datalad": "1.8.0",
+    "datalad-container": "1.2.6",
+    "datalad-fuse": "0.7.0+14.ge480cd8",
+    "remfile": "0.1.15",
+    "con-duct": "0.23.0",
+    "bidsschematools": "1.2.7"
+  },
+  "git": "git version 2.56.0",
+  "git_annex": "10.20260717-g0c917920c80ab1e8cc3d8f5886537708949e1659"
+}
+=== Minting the DataLad dataset of Dandiset 000006 from its S3 manifest ===
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170309.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170310.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369962/sub-anm369962_ses-20170313.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170227.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170226.nwb (file) [registered URL]
+fromkey(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0/sourcedata/000006/sub-anm369963/sub-anm369963_ses-20170228.nwb (file) [registered URL]
+action summary:
+  fromkey (ok: 6)
+Registered 6 of 6 files with their S3 URLs (none downloaded).
+=== Validating Dandiset 000006 (--missing-file-content=stream, -J 8) ===
+dandi validate exited with 1
+=== Summarizing results ===
+=== Writing results ===
+run(ok): <tmp>/runner/pipeline-dandi+validate_tag-d0.82.0-s0.14.0-n0.7.2-p4.2.0-h6.2.0-b3.0.2-v0.4.0 (dataset) [apptainer exec --cleanenv envs/dandi-val...]
+add(ok): derivatives/validation.jsonl (file)
+add(ok): derivatives/validation_summary.txt (file)
+add(ok): sourcedata/000006/dandiset.yaml (file)
+save(ok): . (dataset)
+action summary:
+  add (ok: 3)
+  get (notneeded: 4)
+  run (ok: 1)
+  save (ok: 1)
